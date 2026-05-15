@@ -1,0 +1,123 @@
+import type { Role, SubmissionStatus } from "@/lib/constants";
+
+export type ID = string;
+
+export interface User {
+  id: ID;
+  name: string;
+  email: string;
+  passwordHash: string; // mock: plain or simple hash
+  role: Role;
+  departmentId: ID | null;
+  jobTitle?: string;
+  avatarColor: string; // tailwind bg class
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Department {
+  id: ID;
+  name: string;
+  lead?: ID;
+  description?: string;
+  createdAt: string;
+}
+
+export interface SubmissionType {
+  id: ID;
+  name: string;
+  departmentId: ID | null; // null = applies to all
+  requiredDaily: boolean;
+  deadlineTime: string; // "18:00"
+  allowedFileTypes: string[];
+  maxFileSizeMB: number;
+  isActive: boolean;
+}
+
+export interface Attachment {
+  id: ID;
+  originalName: string;
+  storedName: string;
+  sizeBytes: number;
+  mime: string;
+  hashStub: string;
+  dataUrl?: string; // only for tiny files
+}
+
+export interface Submission {
+  id: ID;
+  userId: ID;
+  submissionTypeId: ID;
+  date: string; // YYYY-MM-DD
+  workSummary: string;
+  tasksDetails: string;
+  attachments: Attachment[];
+  status: SubmissionStatus;
+  locked: boolean;
+  submittedAt: string | null;
+  lockedAt: string | null;
+  uploadedIp: string;
+  versionNumber: number;
+  parentSubmissionId: ID | null;
+  filePath: string;
+}
+
+export interface RevisionRequest {
+  id: ID;
+  submissionId: ID;
+  userId: ID;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  adminId?: ID;
+  adminNote?: string;
+  createdAt: string;
+  decidedAt?: string;
+}
+
+export interface ActivityLog {
+  id: ID;
+  userId: ID;
+  action: string;
+  targetType?: string;
+  targetId?: ID | null;
+  ip?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
+export interface BackupLog {
+  id: ID;
+  adminId: ID;
+  fileName: string;
+  filePath: string;
+  sizeBytes: number;
+  startedAt: string;
+  completedAt: string | null;
+  createdAt: string;
+  status: "running" | "completed" | "failed";
+}
+
+export interface Project {
+  id: ID;
+  name: string;
+  description?: string;
+  departmentId?: ID;
+  lead?: ID;
+  ownerId?: ID;
+  status: "planning" | "in_progress" | "review" | "completed" | "on_hold";
+  members?: ID[];
+  dueDate?: string;
+  progress?: number;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: ID;
+  userId: ID; // recipient
+  type: "info" | "success" | "warning" | "danger";
+  title: string;
+  body: string;
+  link?: string;
+  read: boolean;
+  createdAt: string;
+}
