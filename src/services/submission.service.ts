@@ -5,6 +5,7 @@ import { nowISO, todayISO, isPastDeadline } from "@/lib/dates";
 import { buildSubmissionPath, hashStub, pseudoIp, uid } from "@/lib/helpers";
 import { logService } from "./log.service";
 import { notificationService } from "./notification.service";
+import { workSettingsService } from "./workSettings.service";
 import { MAX_INLINE_DATA_URL_BYTES } from "@/lib/constants";
 
 interface CreateInput {
@@ -168,21 +169,22 @@ export const submissionService = {
     const subs = useDataStore.getState().submissions.filter((s) => s.userId === userId);
     const t = subs.find((s) => s.date === today);
     const now = new Date();
-    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
+    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const isOk = (s: Submission) => s.status === "submitted" || s.status === "revision_approved" || s.status === "late";
     const weekSubs = subs.filter((s) => new Date(s.date) >= startOfWeek && new Date(s.date) <= now);
     const monthSubs = subs.filter((s) => new Date(s.date) >= startOfMonth && new Date(s.date) <= now);
-    const businessDaysBetween = (a: Date, b: Date) => {
-      let n = 0; const d = new Date(a);
-      while (d <= b) { const wd = d.getDay(); if (wd !== 0 && wd !== 6) n++; d.setDate(d.getDate() + 1); }
-      return n;
-    };
     return {
       todayStatus: t?.status ?? "pending",
       todaySubmission: t,
-      week: { submitted: weekSubs.filter(isOk).length, expected: businessDaysBetween(startOfWeek, now) },
-      month: { submitted: monthSubs.filter(isOk).length, expected: businessDaysBetween(startOfMonth, now) },
+      week: {
+        submitted: weekSubs.filter(isOk).length,
+        expected: workSettingsService.countWorkingDays(startOfWeek, now),
+      },
+      month: {
+        submitted: monthSubs.filter(isOk).length,
+        expected: workSettingsService.countWorkingDays(startOfMonth, now),
+      },
     };
   },
 };

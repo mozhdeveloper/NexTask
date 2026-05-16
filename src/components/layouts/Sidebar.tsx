@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { NAV_BY_ROLE } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/auth.service";
 import { useRouter } from "next/navigation";
 
-export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
+export function Sidebar({
+  collapsed = false,
+  onClose,
+}: {
+  collapsed?: boolean;
+  onClose?: () => void;
+}) {
   const user = useAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -29,6 +35,16 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
         ) : (
           <Logo />
         )}
+        {/* Close button on mobile */}
+        {!collapsed && onClose && (
+          <button
+            onClick={onClose}
+            className="ml-auto rounded-md p-1.5 text-ink-muted hover:bg-surface-subtle lg:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2 scrollbar-thin">
         {items.map((it) => {
@@ -38,6 +54,7 @@ export function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
             <Link
               key={it.href}
               href={it.href}
+              onClick={() => onClose?.()}
               className={cn(
                 "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 active

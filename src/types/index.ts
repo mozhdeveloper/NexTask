@@ -121,3 +121,20 @@ export interface Notification {
   read: boolean;
   createdAt: string;
 }
+
+export interface Holiday {
+  date: string; // YYYY-MM-DD
+  label: string;
+}
+
+export interface WorkSettings {
+  workingDays: number[]; // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  holidays: Holiday[];
+}
+
+export interface AutoBackupSettings {
+  enabled: boolean;
+  email: string;
+  time: string; // "22:00"
+  lastAutoBackupDate: string | null;
+}

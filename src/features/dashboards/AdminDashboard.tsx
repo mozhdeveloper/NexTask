@@ -31,6 +31,7 @@ import type { Submission } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
 import { reportService } from "@/services/report.service";
+import { workSettingsService } from "@/services/workSettings.service";
 
 export default function AdminDashboard() {
   const users = useDataStore((s) => s.users);
@@ -45,7 +46,7 @@ export default function AdminDashboard() {
   const todays = submissions.filter((s) => s.date === today);
   const submittedToday = todays.filter((s) => s.status !== "missing" && s.status !== "pending").length;
   const pendingToday = todays.filter((s) => s.status === "pending" || s.status === "missing").length;
-  const overdue = todays.filter((s) => s.status === "late" || s.status === "missing").length;
+  const overdue = todays.filter((s) => (s.status === "late" || s.status === "missing") && workSettingsService.isWorkingDay(s.date)).length;
 
   const days = range === "30d" ? 30 : range === "14d" ? 14 : 7;
   const lineData = useMemo(() => {
@@ -82,7 +83,7 @@ export default function AdminDashboard() {
   });
 
   const overdueRows = todays
-    .filter((s) => s.status === "late" || s.status === "missing")
+    .filter((s) => (s.status === "late" || s.status === "missing") && workSettingsService.isWorkingDay(s.date))
     .slice(0, 5);
 
   const sendReminders = () => toast.success(`Reminders sent to ${overdueRows.length} employee(s).`);

@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Search, MoreVertical, Download } from "lucide-react";
+import { Search, MoreVertical, Download, CalendarOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDataStore } from "@/store/dataStore";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -16,17 +16,21 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { submissionService } from "@/services/submission.service";
+import { workSettingsService } from "@/services/workSettings.service";
 import { downloadBlob, toCsv } from "@/lib/helpers";
 import { useRequireRole } from "@/hooks/useAuth";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 import { toast } from "sonner";
 
+const STATUSES: SubmissionStatus[] = ["submitted", "late", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
+
 export default function AdminSubmissionsPage() {
   useRequireRole(["admin", "manager"]);
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
+  const workSettings = useDataStore((s) => s.workSettings);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SubmissionStatus | "all">("all");
   const [dept, setDept] = useState("all");
@@ -34,6 +38,9 @@ export default function AdminSubmissionsPage() {
   const [selected, setSelected] = useState<Submission | null>(null);
   const [open, setOpen] = useState(false);
   const [unlock, setUnlock] = useState<Submission | null>(null);
+  const [overrideTarget, setOverrideTarget] = useState<Submission | null>(null);
+  const [overrideStatus, setOverrideStatus] = useState<SubmissionStatus>("submitted");
+  const [holidayDate, setHolidayDate] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     return submissions
@@ -71,13 +78,13 @@ export default function AdminSubmissionsPage() {
       <Card>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-60">
+            <div className="relative flex-1 min-w-48">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
               <Input className="pl-9" placeholder="Search employee or summary…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <Input type="date" className="w-44" value={date} onChange={(e) => setDate(e.target.value)} />
             <Select value={dept} onValueChange={setDept}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All departments</SelectItem>
                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
@@ -87,39 +94,78 @@ export default function AdminSubmissionsPage() {
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="late">Late</SelectItem>
-                <SelectItem value="missing">Missing</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="revision_requested">Revision requested</SelectItem>
-                <SelectItem value="revision_approved">Revision approved</SelectItem>
-                <SelectItem value="revision_rejected">Revision rejected</SelectItem>
+                {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Holiday quick-mark banner when date filter is active */}
+          {date && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-2.5 text-sm">
+              <span className="flex items-center gap-2 text-ink">
+                <CalendarOff className="h-4 w-4 text-warning" />
+                {workSettings.holidays.some((h) => h.date === date)
+                  ? <><span className="font-medium">{date}</span> is marked as a holiday. Submissions on this day are excluded from compliance.</>
+                  : <><span className="font-medium">{date}</span> — Mark this date as a non-working day (holiday) to exclude it from compliance.</>}
+              </span>
+              {workSettings.holidays.some((h) => h.date === date) ? (
+                <Button size="sm" variant="outline" onClick={() => { workSettingsService.removeHoliday(date); toast.success("Holiday removed."); }}>
+                  Remove holiday
+                </Button>
+              ) : (
+                <Button size="sm" variant="outline" className="border-warning text-warning hover:bg-warning/10"
+                  onClick={() => setHolidayDate(date)}>
+                  Mark as holiday
+                </Button>
+              )}
+            </div>
+          )}
+
           <Table>
-            <THead><TR><TH>Employee</TH><TH>Date</TH><TH>Summary</TH><TH>Status</TH><TH>At</TH><TH /></TR></THead>
+            <THead>
+              <TR>
+                <TH>Employee</TH>
+                <TH>Date</TH>
+                <TH className="hidden sm:table-cell">Summary</TH>
+                <TH>Status</TH>
+                <TH className="hidden md:table-cell">At</TH>
+                <TH />
+              </TR>
+            </THead>
             <TBody>
               {rows.map((s) => {
                 const u = users.find((x) => x.id === s.userId);
+                const isHolidayRow = workSettings.holidays.some((h) => h.date === s.date);
                 return (
-                  <TR key={s.id}>
+                  <TR key={s.id} className={isHolidayRow ? "opacity-60" : ""}>
                     <TD>
                       <div className="flex items-center gap-2">
                         {u && <Avatar className="h-7 w-7"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>}
-                        <span>{u?.name}</span>
+                        <span className="truncate max-w-[120px]">{u?.name}</span>
                       </div>
                     </TD>
-                    <TD>{fmtDate(s.date)}</TD>
-                    <TD className="max-w-md truncate">{s.workSummary}</TD>
-                    <TD><StatusPill status={s.status} /></TD>
-                    <TD className="text-ink-muted">{fmtTime(s.submittedAt)}</TD>
+                    <TD className="whitespace-nowrap">{fmtDate(s.date)}</TD>
+                    <TD className="hidden sm:table-cell max-w-[200px] truncate">{s.workSummary}</TD>
+                    <TD>
+                      <div className="flex items-center gap-1.5">
+                        <StatusPill status={s.status} />
+                        {isHolidayRow && <span title="Holiday" className="text-[10px] bg-amber-100 text-amber-700 rounded px-1">holiday</span>}
+                      </div>
+                    </TD>
+                    <TD className="hidden md:table-cell text-ink-muted whitespace-nowrap">{fmtTime(s.submittedAt)}</TD>
                     <TD>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => { setSelected(s); setOpen(true); }}>View details</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => { setOverrideTarget(s); setOverrideStatus(s.status); }}>
+                            Override status
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setHolidayDate(s.date)}>
+                            <CalendarOff className="h-4 w-4" />
+                            Mark date as holiday
+                          </DropdownMenuItem>
                           {s.locked && (
                             <>
                               <DropdownMenuSeparator />
@@ -132,11 +178,17 @@ export default function AdminSubmissionsPage() {
                   </TR>
                 );
               })}
+              {rows.length === 0 && (
+                <TR><TD colSpan={6} className="py-10 text-center text-ink-muted">No submissions match the current filters.</TD></TR>
+              )}
             </TBody>
           </Table>
         </CardContent>
       </Card>
+
       <SubmissionDetailsModal open={open} onOpenChange={setOpen} submission={selected} />
+
+      {/* Unlock confirmation */}
       <ConfirmModal
         open={!!unlock}
         onOpenChange={(v) => !v && setUnlock(null)}
@@ -150,6 +202,51 @@ export default function AdminSubmissionsPage() {
           toast.success("Submission unlocked.");
         }}
       />
+
+      {/* Mark holiday confirmation */}
+      <ConfirmModal
+        open={!!holidayDate}
+        onOpenChange={(v) => !v && setHolidayDate(null)}
+        title={`Mark ${holidayDate} as a holiday?`}
+        description="Submissions on this date will be excluded from compliance reports and overdue calculations. You can remove it any time from Settings."
+        confirmLabel="Mark as holiday"
+        onConfirm={() => {
+          if (!holidayDate) return;
+          workSettingsService.addHoliday(holidayDate, "Holiday");
+          toast.success(`${holidayDate} marked as a holiday.`);
+          setHolidayDate(null);
+        }}
+      />
+
+      {/* Override status modal */}
+      {overrideTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-pop space-y-4">
+            <h2 className="text-base font-semibold text-ink">Override Submission Status</h2>
+            <p className="text-sm text-ink-muted">
+              Manually set the status for{" "}
+              <span className="font-medium">{users.find((u) => u.id === overrideTarget.userId)?.name}</span>{" "}
+              on {fmtDate(overrideTarget.date)}.
+            </p>
+            <div className="space-y-1.5">
+              <Select value={overrideStatus} onValueChange={(v) => setOverrideStatus(v as SubmissionStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setOverrideTarget(null)}>Cancel</Button>
+              <Button onClick={() => {
+                submissionService.markStatus(overrideTarget.id, overrideStatus);
+                toast.success("Status overridden.");
+                setOverrideTarget(null);
+              }}>Apply</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

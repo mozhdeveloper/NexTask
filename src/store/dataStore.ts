@@ -10,6 +10,8 @@ import type {
   BackupLog,
   Project,
   Notification,
+  WorkSettings,
+  AutoBackupSettings,
 } from "@/types";
 import {
   seedUsers,
@@ -34,6 +36,8 @@ interface DataState {
   backups: BackupLog[];
   projects: Project[];
   notifications: Notification[];
+  workSettings: WorkSettings;
+  autoBackupSettings: AutoBackupSettings;
   hydrated: boolean;
 
   setUsers: (u: User[]) => void;
@@ -43,6 +47,8 @@ interface DataState {
   setProjects: (p: Project[]) => void;
   setNotifications: (n: Notification[]) => void;
   setLogs: (l: ActivityLog[]) => void;
+  setWorkSettings: (s: WorkSettings) => void;
+  setAutoBackupSettings: (s: AutoBackupSettings) => void;
   reset: () => void;
 }
 
@@ -56,6 +62,16 @@ const initial = () => ({
   backups: seedBackupLogs,
   projects: seedProjects,
   notifications: seedNotifications,
+  workSettings: {
+    workingDays: [1, 2, 3, 4, 5], // Mon–Fri
+    holidays: [] as WorkSettings["holidays"],
+  } as WorkSettings,
+  autoBackupSettings: {
+    enabled: false,
+    email: "",
+    time: "22:00",
+    lastAutoBackupDate: null,
+  } as AutoBackupSettings,
 });
 
 export const useDataStore = create<DataState>()(
@@ -70,6 +86,8 @@ export const useDataStore = create<DataState>()(
       setProjects: (projects) => set({ projects }),
       setNotifications: (notifications) => set({ notifications }),
       setLogs: (logs) => set({ logs }),
+      setWorkSettings: (workSettings) => set({ workSettings }),
+      setAutoBackupSettings: (autoBackupSettings) => set({ autoBackupSettings }),
       reset: () => set({ ...initial() }),
     }),
     {
