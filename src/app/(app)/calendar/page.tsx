@@ -44,43 +44,47 @@ export default function CalendarPage() {
               <Button size="icon" variant="ghost" onClick={() => setCursor(addMonths(cursor, 1))}><ChevronRight className="h-4 w-4" /></Button>
             </div>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-xs font-medium text-ink-muted">
-            {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
-              <div key={d} className="px-2 py-1">{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((d) => {
-              const iso = format(d, "yyyy-MM-dd");
-              const sub = myMap.get(iso);
-              const inMonth = isSameMonth(d, cursor);
-              const today = isSameDay(d, new Date());
-              const isPicked = picked && isSameDay(picked, d);
-              const dotColor = sub
-                ? sub.status === "submitted" || sub.status === "revision_approved"
-                  ? "bg-emerald-500"
-                  : sub.status === "late"
-                  ? "bg-amber-500"
-                  : sub.status === "missing" || sub.status === "revision_rejected"
-                  ? "bg-rose-500"
-                  : "bg-violet-500"
-                : "";
-              return (
-                <button
-                  key={iso}
-                  onClick={() => setPicked(d)}
-                  className={cn(
-                    "aspect-square rounded-lg border p-2 text-left transition",
-                    inMonth ? "border-surface-border bg-white hover:border-primary" : "border-transparent bg-surface-subtle text-ink-soft",
-                    today && "ring-1 ring-primary",
-                    isPicked && "border-primary bg-primary-soft/40"
-                  )}
-                >
-                  <div className="text-xs font-medium">{format(d, "d")}</div>
-                  {sub && <div className={cn("mt-1 h-2 w-2 rounded-full", dotColor)} />}
-                </button>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <div className="min-w-[420px]">
+              <div className="grid grid-cols-7 gap-1 text-xs font-medium text-ink-muted">
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
+                  <div key={d} className="px-2 py-1">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {days.map((d) => {
+                  const iso = format(d, "yyyy-MM-dd");
+                  const sub = myMap.get(iso);
+                  const inMonth = isSameMonth(d, cursor);
+                  const today = isSameDay(d, new Date());
+                  const isPicked = picked && isSameDay(picked, d);
+                  const dotColor = sub
+                    ? sub.status === "submitted" || sub.status === "revision_approved"
+                      ? "bg-emerald-500"
+                      : sub.status === "late"
+                      ? "bg-amber-500"
+                      : sub.status === "missing" || sub.status === "revision_rejected"
+                      ? "bg-rose-500"
+                      : "bg-violet-500"
+                    : "";
+                  return (
+                    <button
+                      key={iso}
+                      onClick={() => setPicked(d)}
+                      className={cn(
+                        "aspect-square rounded-lg border p-2 text-left transition",
+                        inMonth ? "border-surface-border bg-white hover:border-primary" : "border-transparent bg-surface-subtle text-ink-soft",
+                        today && "ring-1 ring-primary",
+                        isPicked && "border-primary bg-primary-soft/40"
+                      )}
+                    >
+                      <div className="text-xs font-medium">{format(d, "d")}</div>
+                      {sub && <div className={cn("mt-1 h-2 w-2 rounded-full", dotColor)} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

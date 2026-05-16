@@ -178,8 +178,8 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <div className="flex-1 min-w-[140px]">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex-1 min-w-0">
                 <Label>Date</Label>
                 <Input
                   type="date"
@@ -187,7 +187,7 @@ export default function SettingsPage() {
                   onChange={(e) => setNewHolidayDate(e.target.value)}
                 />
               </div>
-              <div className="flex-[2] min-w-[180px]">
+              <div className="flex-[2] min-w-0">
                 <Label>Label</Label>
                 <Input
                   placeholder="e.g. National Day"

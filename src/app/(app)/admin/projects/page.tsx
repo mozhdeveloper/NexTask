@@ -37,7 +37,7 @@ export default function ProjectsPage() {
         description="Track ongoing initiatives across the office."
         actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="h-4 w-4" /> New project</Button>}
       />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {projects.map((p) => {
           const owner = users.find((u) => u.id === (p.ownerId ?? p.lead));
           const progress = p.progress ?? 0;

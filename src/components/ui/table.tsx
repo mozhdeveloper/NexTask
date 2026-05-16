@@ -19,12 +19,12 @@ export const TR = ({ className, ...props }: React.HTMLAttributes<HTMLTableRowEle
 export const TH = ({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) => (
   <th
     className={cn(
-      "h-10 px-4 text-left align-middle text-xs font-medium uppercase tracking-wide text-ink-muted",
+      "h-10 px-2 text-left align-middle text-xs font-medium uppercase tracking-wide text-ink-muted sm:px-4",
       className
     )}
     {...props}
   />
 );
 export const TD = ({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) => (
-  <td className={cn("px-4 py-3 align-middle text-ink", className)} {...props} />
+  <td className={cn("px-2 py-2 align-middle text-ink text-xs sm:px-4 sm:py-3 sm:text-sm", className)} {...props} />
 );

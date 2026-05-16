@@ -77,21 +77,21 @@ export default function AdminSubmissionsPage() {
       />
       <Card>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-48">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="relative w-full flex-1 min-w-0 sm:min-w-48">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
               <Input className="pl-9" placeholder="Search employee or summary…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            <Input type="date" className="w-44" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input type="date" className="w-full sm:w-44" value={date} onChange={(e) => setDate(e.target.value)} />
             <Select value={dept} onValueChange={setDept}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All departments</SelectItem>
                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={status} onValueChange={(v) => setStatus(v as SubmissionStatus | "all")}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 {STATUSES.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
@@ -141,11 +141,11 @@ export default function AdminSubmissionsPage() {
                     <TD>
                       <div className="flex items-center gap-2">
                         {u && <Avatar className="h-7 w-7"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>}
-                        <span className="truncate max-w-[120px]">{u?.name}</span>
+                        <span className="truncate max-w-[90px] sm:max-w-[120px]">{u?.name}</span>
                       </div>
                     </TD>
                     <TD className="whitespace-nowrap">{fmtDate(s.date)}</TD>
-                    <TD className="hidden sm:table-cell max-w-[200px] truncate">{s.workSummary}</TD>
+                    <TD className="hidden sm:table-cell max-w-[150px] lg:max-w-[200px] truncate">{s.workSummary}</TD>
                     <TD>
                       <div className="flex items-center gap-1.5">
                         <StatusPill status={s.status} />
@@ -221,7 +221,7 @@ export default function AdminSubmissionsPage() {
       {/* Override status modal */}
       {overrideTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-pop space-y-4">
+          <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto rounded-xl bg-white p-4 sm:p-6 shadow-pop space-y-4">
             <h2 className="text-base font-semibold text-ink">Override Submission Status</h2>
             <p className="text-sm text-ink-muted">
               Manually set the status for{" "}

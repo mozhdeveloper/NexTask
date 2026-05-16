@@ -27,7 +27,7 @@ export default function BackupsPage() {
         description="Generate and review office-wide backup runs."
         actions={<Button onClick={() => setOpen(true)}><Play className="h-4 w-4" /> Run backup</Button>}
       />
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         <StatCard icon={Database} label="Total backups" value={backups.length} sublabel="all time" tint="indigo" />
         <StatCard icon={Database} label="Successful" value={success} sublabel={`${Math.round((success/Math.max(backups.length,1))*100)}% success rate`} tint="mint" />
         <StatCard icon={Database} label="Last backup" value={last ? fmtDate(last.createdAt, "MMM dd") : "—"} sublabel={last ? fmtBytes(last.sizeBytes) : ""} tint="teal" />

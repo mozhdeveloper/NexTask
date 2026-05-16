@@ -48,7 +48,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0">
+          <PopoverContent className="w-[calc(100vw-1rem)] max-w-sm p-0 sm:w-80">
             <div className="flex items-center justify-between border-b border-surface-border p-3">
               <div className="text-sm font-semibold">Notifications</div>
               {myNotifs.length > 0 && (

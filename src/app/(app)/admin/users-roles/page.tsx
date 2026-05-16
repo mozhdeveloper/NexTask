@@ -39,7 +39,7 @@ export default function UsersRolesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Users & Roles" description="Roles define what each member can access in the workspace." />
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
         {(["admin","manager","employee"] as const).map((r) => (
           <Card key={r}>
             <CardHeader>

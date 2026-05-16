@@ -105,7 +105,7 @@ export default function AdminDashboard() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard icon={Users} label="Total Employees" value={employees.length} sublabel="active" tint="indigo" />
         <StatCard icon={ClipboardList} label="Today's Submissions" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
         <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="awaiting" tint="amber" />
@@ -113,12 +113,12 @@ export default function AdminDashboard() {
         <StatCard icon={AlertTriangle} label="Overdue" value={overdue} sublabel="late/missing" tint="rose" />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Submission Overview</CardTitle>
             <Select value={range} onValueChange={setRange}>
-              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="7d">Last 7 days</SelectItem>
                 <SelectItem value="14d">Last 14 days</SelectItem>
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Submissions</CardTitle>

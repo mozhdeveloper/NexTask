@@ -44,13 +44,13 @@ export default function EmployeesPage() {
       />
       <Card>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-60">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="relative w-full flex-1 min-w-0 sm:min-w-60">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
               <Input className="pl-9" placeholder="Search by name or email…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <Select value={dept} onValueChange={setDept}>
-              <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-52"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All departments</SelectItem>
                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}

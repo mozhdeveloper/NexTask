@@ -22,7 +22,7 @@ export default function MyWorkPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="My Work" description={`Submit and review your daily work for ${fmtDate(today)}.`} />
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader><CardTitle>Today’s Submission</CardTitle></CardHeader>
           <CardContent><SubmitWorkForm /></CardContent>
