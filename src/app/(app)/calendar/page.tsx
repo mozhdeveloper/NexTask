@@ -198,6 +198,7 @@ export default function CalendarPage() {
   const handleSelect = (d: Date, sub?: Submission) => {
     setPicked(d);
     if (view === "month") setCursor(d); // keep cursor in sync
+    if (sub) setModal(sub); // single-click to view details when a submission exists
   };
 
   return (

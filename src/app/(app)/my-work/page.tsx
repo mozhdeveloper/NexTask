@@ -8,6 +8,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { fmtDate, fmtTime, todayISO } from "@/lib/dates";
 import { StatusPill } from "@/components/ui/status-pill";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import type { Submission } from "@/types";
 
@@ -17,16 +18,18 @@ export default function MyWorkPage() {
   const submissions = useDataStore((s) => s.submissions);
   const [selected, setSelected] = useState<Submission | null>(null);
   const [open, setOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get("date") ?? undefined;
   if (!ready || !user) return null;
   const today = todayISO();
   const recent = submissions.filter((s) => s.userId === user.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
   return (
     <div className="space-y-6">
-      <PageHeader title="My Work" description={`Submit and review your daily work for ${fmtDate(today)}.`} />
+      <PageHeader title="My Work" description={`Submit and review your daily work for ${fmtDate(dateParam ?? today)}.`} />
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader><CardTitle>Today’s Submission</CardTitle></CardHeader>
-          <CardContent><SubmitWorkForm /></CardContent>
+          <CardHeader><CardTitle>{dateParam && dateParam !== today ? `Submission for ${fmtDate(dateParam)}` : "Today's Submission"}</CardTitle></CardHeader>
+          <CardContent><SubmitWorkForm defaultDate={dateParam} /></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Recent</CardTitle></CardHeader>
