@@ -383,6 +383,9 @@ describe("mapWorkSettings", () => {
       due_date: "2026-06-01",
       start_date: null,
       completed_at: null,
+      revision_status: null,
+      revision_requested_by: null,
+      revision_note: null,
       progress: 45,
       created_at: "2026-01-01T00:00:00Z",
     };

@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase/client";
 import { mapProject } from "@/lib/supabase/mappers";
 import type { DbProjectRow } from "@/lib/supabase/types";
 import { logService } from "./log.service";
+import { notificationService } from "./notification.service";
 
 function warn(label: string, e: unknown) {
   // eslint-disable-next-line no-console
@@ -79,6 +80,9 @@ export const projectService = {
     if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate ?? null;
     if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt ?? null;
     if (patch.progress !== undefined) dbPatch.progress = patch.progress;
+    if (patch.revisionStatus !== undefined) dbPatch.revision_status = patch.revisionStatus ?? null;
+    if (patch.revisionRequestedBy !== undefined) dbPatch.revision_requested_by = patch.revisionRequestedBy ?? null;
+    if (patch.revisionNote !== undefined) dbPatch.revision_note = patch.revisionNote ?? null;
 
     if (Object.keys(dbPatch).length === 0) return;
     supabase
@@ -116,5 +120,41 @@ export const projectService = {
     }
     const mapped = (data ?? []).map((r) => mapProject(r as DbProjectRow));
     useDataStore.getState().setProjects(mapped);
+  },
+
+  async requestRevision(id: string, note?: string) {
+    const me = useAuthStore.getState().user;
+    if (!me) throw new Error("Forbidden");
+    this.update(id, { revisionStatus: "pending", revisionRequestedBy: me.id, revisionNote: note });
+    logService.append({ userId: me.id, action: "project.revision_requested", targetType: "project", targetId: id });
+    const users = useDataStore.getState().users;
+    users
+      .filter((u) => u.isActive && (u.role === "manager" || u.role === "admin"))
+      .forEach((m) =>
+        notificationService.push({
+          userId: m.id,
+          type: "warning",
+          title: "Project revision requested",
+          body: `${me.name} requested a revision on a project.`,
+          link: "/manager/projects",
+        })
+      );
+  },
+
+  async reviewRevision(id: string, verdict: "approved" | "rejected", note?: string) {
+    const me = useAuthStore.getState().user;
+    if (!me) throw new Error("Forbidden");
+    const project = useDataStore.getState().projects.find((p) => p.id === id);
+    this.update(id, { revisionStatus: verdict, revisionNote: note });
+    logService.append({ userId: me.id, action: `project.revision_${verdict}`, targetType: "project", targetId: id });
+    if (project?.revisionRequestedBy) {
+      notificationService.push({
+        userId: project.revisionRequestedBy,
+        type: verdict === "approved" ? "success" : "danger",
+        title: `Project revision ${verdict}`,
+        body: `Your revision request was ${verdict}${note ? `: ${note}` : "."}`,
+        link: "/projects",
+      });
+    }
   },
 };

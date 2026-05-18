@@ -143,6 +143,9 @@ export const mapProject = (r: DbProjectRow): Project => ({
   dueDate: r.due_date ?? undefined,
   completedAt: r.completed_at ?? undefined,
   progress: r.progress ?? undefined,
+  revisionStatus: (r.revision_status as Project["revisionStatus"]) ?? undefined,
+  revisionRequestedBy: r.revision_requested_by ?? undefined,
+  revisionNote: r.revision_note ?? undefined,
   createdAt: r.created_at,
 });
 

@@ -28,6 +28,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "My Daily Work", href: "/my-work", icon: ClipboardList },
     { label: "My Submissions", href: "/my-submissions", icon: FileText },
     { label: "Calendar", href: "/calendar", icon: CalendarDays },
+    { label: "Projects", href: "/projects", icon: FolderKanban },
     { label: "Profile", href: "/profile", icon: UserIcon },
     { label: "Settings", href: "/settings", icon: Settings },
   ],

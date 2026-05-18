@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { initials } from "@/lib/status";
 import { fmtDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -51,7 +52,7 @@ function StatusBadge({ status }: { status: Project["status"] }) {
 }
 
 export default function ProjectsPage() {
-  const { ready } = useRequireRole(["admin", "manager"]);
+  const { ready } = useRequireRole(["admin", "manager", "employee"]);
   const canManage = usePermission("manage_projects");
   const projects = useDataStore((s) => s.projects);
   const users = useDataStore((s) => s.users);
@@ -142,7 +143,7 @@ export default function ProjectsPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1 min-w-0 sm:min-w-56">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
-          <Input className="pl-9" placeholder="Search projectsâ€¦" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className="pl-9" placeholder="Search projects…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
           <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
@@ -240,8 +241,19 @@ export default function ProjectsPage() {
                     )}
                   </div>
 
-                  {/* Status */}
-                  <StatusBadge status={p.status} />
+                  {/* Status + revision */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <StatusBadge status={p.status} />
+                    {p.revisionStatus === "pending" && (
+                      <Badge variant="warning" className="text-[10px] px-1.5 py-0">Revision Requested</Badge>
+                    )}
+                    {p.revisionStatus === "approved" && (
+                      <Badge variant="success" className="text-[10px] px-1.5 py-0">Revision Approved</Badge>
+                    )}
+                    {p.revisionStatus === "rejected" && (
+                      <Badge variant="muted" className="text-[10px] px-1.5 py-0">Revision Rejected</Badge>
+                    )}
+                  </div>
 
                   {/* Dates */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -342,7 +354,7 @@ export default function ProjectsPage() {
                           </div>
                         </div>
                       </TD>
-                      <TD><StatusBadge status={p.status} /></TD>
+                      <TD><StatusBadge status={p.status} />{p.revisionStatus === "pending" && <Badge variant="warning" className="ml-1 text-[10px] px-1.5 py-0">Revision</Badge>}</TD>
                       <TD className="hidden sm:table-cell">
                         {ownerUser && (
                           <div className="flex items-center gap-1.5">
@@ -359,7 +371,7 @@ export default function ProjectsPage() {
                             <CalendarPlus className="h-3.5 w-3.5" />
                             {fmtDate(p.startDate, "MMM dd, yyyy")}
                           </span>
-                        ) : "â€”"}
+                        ) : "—"}
                       </TD>
                       <TD className="hidden md:table-cell">
                         {p.dueDate ? (
@@ -371,7 +383,7 @@ export default function ProjectsPage() {
                             <CalendarDays className="h-3.5 w-3.5" />
                             {fmtDate(p.dueDate, "MMM dd, yyyy")}
                           </span>
-                        ) : "â€”"}
+                        ) : "—"}
                       </TD>
                       <TD className="hidden lg:table-cell text-sm text-ink-muted">
                         {p.completedAt ? (
@@ -379,7 +391,7 @@ export default function ProjectsPage() {
                             <CalendarCheck className="h-3.5 w-3.5" />
                             {fmtDate(p.completedAt, "MMM dd, yyyy")}
                           </span>
-                        ) : "â€”"}
+                        ) : "—"}
                       </TD>
                       <TD className="hidden sm:table-cell">
                         {memberUsers.length > 0 && (

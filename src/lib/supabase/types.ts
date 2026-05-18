@@ -129,6 +129,9 @@ export interface DbProjectRow {
   due_date: string | null;
   completed_at: string | null;
   progress: number;
+  revision_status: string | null;
+  revision_requested_by: string | null;
+  revision_note: string | null;
   created_at: string;
 }
 

@@ -1,9 +1,11 @@
 ﻿"use client";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useDataStore } from "@/store/dataStore";
+import { useAuth } from "@/hooks/useAuth";
 import { initials } from "@/lib/status";
 import { fmtDate } from "@/lib/dates";
 import {
@@ -15,9 +17,14 @@ import {
   Building2,
   Pencil,
   Clock,
+  MessageSquarePlus,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/types";
+import { projectService } from "@/services/project.service";
+import { toast } from "sonner";
 
 const STATUS_CONFIG: Record<
   Project["status"],
@@ -43,6 +50,11 @@ export function ProjectDetailsModal({
 }) {
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
+  const currentUser = useAuth();
+  const [revisionMode, setRevisionMode] = useState(false);
+  const [revisionNote, setRevisionNote] = useState("");
+  const [loading, setLoading] = useState(false);
+
   if (!project) return null;
 
   const sc = STATUS_CONFIG[project.status];
@@ -79,6 +91,32 @@ export function ProjectDetailsModal({
     );
   }
 
+  async function handleRequestRevision() {
+    setLoading(true);
+    try {
+      await projectService.requestRevision(project!.id, revisionNote.trim() || undefined);
+      toast.success("Revision request submitted.");
+      setRevisionMode(false);
+      setRevisionNote("");
+    } catch {
+      toast.error("Failed to submit revision request.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleReviewRevision(verdict: "approved" | "rejected") {
+    setLoading(true);
+    try {
+      await projectService.reviewRevision(project!.id, verdict);
+      toast.success(`Revision ${verdict}.`);
+    } catch {
+      toast.error("Failed to update revision.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
@@ -102,7 +140,7 @@ export function ProjectDetailsModal({
             )}
           </div>
 
-          {/* Status + department */}
+          {/* Status + department + revision badge */}
           <div className="mt-3 flex flex-wrap items-center gap-2 px-6">
             <span
               className={cn(
@@ -118,6 +156,15 @@ export function ProjectDetailsModal({
                 <Building2 className="h-3.5 w-3.5" />
                 {dept.name}
               </span>
+            )}
+            {project.revisionStatus === "pending" && (
+              <Badge variant="warning" className="text-xs">Revision Requested</Badge>
+            )}
+            {project.revisionStatus === "approved" && (
+              <Badge variant="success" className="text-xs">Revision Approved</Badge>
+            )}
+            {project.revisionStatus === "rejected" && (
+              <Badge variant="muted" className="text-xs">Revision Rejected</Badge>
             )}
           </div>
 
@@ -219,10 +266,65 @@ export function ProjectDetailsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-shrink-0 items-center justify-end border-t bg-muted/20 px-6 py-3">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+        <div className="flex flex-shrink-0 flex-col gap-3 border-t bg-muted/20 px-6 py-4">
+          {/* Employee: revision request form */}
+          {currentUser?.role === "employee" && revisionMode && (
+            <div className="flex flex-col gap-2">
+              <textarea
+                className="min-h-[80px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Describe why you're requesting a revision…"
+                value={revisionNote}
+                onChange={(e) => setRevisionNote(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => { setRevisionMode(false); setRevisionNote(""); }}>
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={!revisionNote.trim() || loading} onClick={handleRequestRevision}>
+                  Submit Request
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              {/* Employee: request revision button */}
+              {currentUser?.role === "employee" && !revisionMode && project.revisionStatus !== "pending" && (
+                <Button variant="outline" size="sm" onClick={() => setRevisionMode(true)}>
+                  <MessageSquarePlus className="h-3.5 w-3.5" />
+                  Request Revision
+                </Button>
+              )}
+              {/* Manager / Admin: approve or reject pending revision */}
+              {(currentUser?.role === "manager" || currentUser?.role === "admin") && project.revisionStatus === "pending" && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    disabled={loading}
+                    onClick={() => handleReviewRevision("approved")}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                    disabled={loading}
+                    onClick={() => handleReviewRevision("rejected")}
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Reject
+                  </Button>
+                </>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

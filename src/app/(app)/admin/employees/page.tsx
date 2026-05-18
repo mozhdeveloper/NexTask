@@ -19,12 +19,14 @@ import { toast } from "sonner";
 import type { User } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRequireRole } from "@/hooks/useAuth";
+import { usePermission } from "@/hooks/usePermission";
 import { Pagination } from "@/components/ui/pagination";
 
 const PAGE_SIZE = 20;
 
 export default function EmployeesPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
+  const canManage = usePermission("manage_employees");
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
   const [q, setQ] = useState("");
@@ -53,7 +55,7 @@ export default function EmployeesPage() {
       <PageHeader
         title="Employees"
         description="Manage members of your office workspace."
-        actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="h-4 w-4" /> Add employee</Button>}
+        actions={canManage ? <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="h-4 w-4" /> Add employee</Button> : undefined}
       />
       <Card>
         <CardContent className="space-y-4">
@@ -106,11 +108,13 @@ export default function EmployeesPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetails(u); }}>View details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(u); setOpen(true); }}>Edit</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirm(u); }}>
-                            {u.isActive ? "Deactivate" : "Reactivate"}
-                          </DropdownMenuItem>
+                          {canManage && <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(u); setOpen(true); }}>Edit</DropdownMenuItem>}
+                          {canManage && <DropdownMenuSeparator />}
+                          {canManage && (
+                            <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirm(u); }}>
+                              {u.isActive ? "Deactivate" : "Reactivate"}
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TD>
@@ -133,7 +137,7 @@ export default function EmployeesPage() {
         open={!!details}
         onOpenChange={(v) => !v && setDetails(null)}
         user={details}
-        onEdit={() => { if (details) { setEditing(details); setDetails(null); setOpen(true); } }}
+        onEdit={canManage ? () => { if (details) { setEditing(details); setDetails(null); setOpen(true); } } : undefined}
       />
       <ConfirmModal
         open={!!confirm}

@@ -111,6 +111,9 @@ export interface Project {
   dueDate?: string;       // YYYY-MM-DD, optional
   completedAt?: string;   // YYYY-MM-DD, set when status → completed
   progress?: number;
+  revisionStatus?: "pending" | "approved" | "rejected";
+  revisionRequestedBy?: string;
+  revisionNote?: string;
   createdAt: string;
 }
 
