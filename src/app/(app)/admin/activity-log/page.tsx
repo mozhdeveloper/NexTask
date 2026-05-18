@@ -1,35 +1,120 @@
 "use client";
 import { useMemo, useState, useCallback, useEffect } from "react";
+import {
+  LogIn, LogOut, KeyRound, Upload, Unlock, CheckCircle2, XCircle,
+  UserPlus, UserCog, Users, FolderPlus, Folder, FolderMinus,
+  Settings, HardDrive, FileDown, AlertTriangle, RefreshCw,
+  Download, Search, Activity, ShieldCheck, CalendarOff, CalendarPlus,
+  ClipboardCheck, Pencil,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Input } from "@/components/ui/input";
-import { Search, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useDataStore } from "@/store/dataStore";
-import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { fmtDate } from "@/lib/dates";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { initials } from "@/lib/status";
-import { downloadBlob, toCsv } from "@/lib/helpers";
-import { useRequireRole } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { logService } from "@/services/log.service";
-import { toast } from "sonner";
 import { Pagination } from "@/components/ui/pagination";
+import { useDataStore } from "@/store/dataStore";
+import { useRequireRole } from "@/hooks/useAuth";
+import { logService } from "@/services/log.service";
+import { downloadBlob, toCsv } from "@/lib/helpers";
+import { initials } from "@/lib/status";
+import { fmtDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import type { ActivityLog } from "@/types";
+import type { ComponentType } from "react";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
-const ACTION_GROUPS: Record<string, string[]> = {
-  "auth": ["auth.login", "auth.logout"],
-  "submission": ["submission.upload", "submission.unlock", "submission.mark_status"],
-  "revision": ["revision.request", "revision.approve", "revision.reject"],
-  "user": ["user.create", "user.update", "user.toggle_active"],
-  "project": ["project.create", "project.update"],
-  "settings": ["settings.holiday_add", "settings.holiday_remove", "settings.working_days_update"],
-  "report": [],   // prefix match
-  "backup": ["backup.run"],
+// ─── Action metadata ───────────────────────────────────────────────────────────
+type ActionMeta = {
+  label: string;
+  Icon: ComponentType<{ className?: string }>;
+  bg: string;   // icon container bg
+  text: string; // icon colour
+  badgeVariant: "default" | "success" | "warning" | "danger" | "info" | "muted";
+  group: string;
 };
+
+const ACTION_META: Record<string, ActionMeta> = {
+  "auth.login":                   { label: "Logged in",               Icon: LogIn,          bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "auth" },
+  "auth.logout":                  { label: "Logged out",              Icon: LogOut,         bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "auth" },
+  "auth.password_change":         { label: "Changed password",        Icon: KeyRound,       bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "auth" },
+  "submission.upload":            { label: "Submitted daily work",    Icon: Upload,         bg: "bg-blue-100",    text: "text-blue-600",    badgeVariant: "info",     group: "submission" },
+  "submission.unlock":            { label: "Unlocked submission",     Icon: Unlock,         bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "submission" },
+  "submission.mark_status":       { label: "Updated submission status", Icon: ClipboardCheck, bg: "bg-blue-100", text: "text-blue-600",    badgeVariant: "info",     group: "submission" },
+  "revision.request":             { label: "Requested revision",      Icon: Pencil,         bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "revision" },
+  "revision.approve":             { label: "Approved revision",       Icon: CheckCircle2,   bg: "bg-emerald-100", text: "text-emerald-600", badgeVariant: "success",  group: "revision" },
+  "revision.reject":              { label: "Rejected revision",       Icon: XCircle,        bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "revision" },
+  "user.create":                  { label: "Created user account",    Icon: UserPlus,       bg: "bg-violet-100",  text: "text-violet-600",  badgeVariant: "info",     group: "user" },
+  "user.update":                  { label: "Updated user profile",    Icon: UserCog,        bg: "bg-violet-100",  text: "text-violet-500",  badgeVariant: "muted",    group: "user" },
+  "user.toggle_active":           { label: "Toggled user status",     Icon: Users,          bg: "bg-violet-100",  text: "text-violet-600",  badgeVariant: "warning",  group: "user" },
+  "project.create":               { label: "Created project",         Icon: FolderPlus,     bg: "bg-teal-100",    text: "text-teal-600",    badgeVariant: "info",     group: "project" },
+  "project.update":               { label: "Updated project",         Icon: Folder,         bg: "bg-teal-100",    text: "text-teal-500",    badgeVariant: "muted",    group: "project" },
+  "project.delete":               { label: "Deleted project",         Icon: FolderMinus,    bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "project" },
+  "settings.holiday_add":         { label: "Added holiday",           Icon: CalendarPlus,   bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
+  "settings.holiday_remove":      { label: "Removed holiday",         Icon: CalendarOff,    bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
+  "settings.working_days_update": { label: "Updated working days",    Icon: Settings,       bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
+  "settings.permissions_update":  { label: "Updated permissions",     Icon: ShieldCheck,    bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
+  "backup.run":                   { label: "Ran backup",              Icon: HardDrive,      bg: "bg-purple-100",  text: "text-purple-600",  badgeVariant: "muted",    group: "backup" },
+  "report.export":                { label: "Exported report",         Icon: FileDown,       bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "report" },
+  "db.reset":                     { label: "Reset database",          Icon: AlertTriangle,  bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "system" },
+};
+
+function getMeta(action: string): ActionMeta {
+  if (ACTION_META[action]) return ACTION_META[action];
+  const prefix = action.split(".")[0];
+  const fallbacks: Record<string, ActionMeta> = {
+    auth:       { label: action, Icon: LogIn,         bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "auth" },
+    submission: { label: action, Icon: Upload,        bg: "bg-blue-100",    text: "text-blue-500",    badgeVariant: "info",     group: "submission" },
+    revision:   { label: action, Icon: Pencil,        bg: "bg-amber-100",   text: "text-amber-500",   badgeVariant: "warning",  group: "revision" },
+    user:       { label: action, Icon: UserCog,       bg: "bg-violet-100",  text: "text-violet-500",  badgeVariant: "muted",    group: "user" },
+    project:    { label: action, Icon: Folder,        bg: "bg-teal-100",    text: "text-teal-500",    badgeVariant: "muted",    group: "project" },
+    settings:   { label: action, Icon: Settings,      bg: "bg-orange-100",  text: "text-orange-500",  badgeVariant: "warning",  group: "settings" },
+    backup:     { label: action, Icon: HardDrive,     bg: "bg-purple-100",  text: "text-purple-500",  badgeVariant: "muted",    group: "backup" },
+    report:     { label: action, Icon: FileDown,      bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "report" },
+  };
+  return fallbacks[prefix] ?? { label: action, Icon: Activity, bg: "bg-slate-100", text: "text-slate-500", badgeVariant: "muted", group: "other" };
+}
+
+// ─── Relative time ─────────────────────────────────────────────────────────────
+function relativeTime(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)    return "just now";
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return fmtDate(iso, "MMM dd, yyyy");
+}
+
+// ─── Target label ──────────────────────────────────────────────────────────────
+function targetLabel(l: ActivityLog, users: ReturnType<typeof useDataStore.getState>["users"]): string | null {
+  if (!l.targetType) return null;
+  if (l.targetType === "user") {
+    const u = users.find((x) => x.id === l.targetId);
+    return u ? u.name : l.targetId ?? null;
+  }
+  if (l.targetType === "project") {
+    // We don't have projects here but targetId works
+    return l.targetId ? `#${l.targetId.slice(-6)}` : null;
+  }
+  return l.targetId ? `${l.targetType} #${l.targetId.slice(-6)}` : l.targetType;
+}
+
+const ACTION_GROUPS = [
+  { value: "all",        label: "All actions" },
+  { value: "auth",       label: "Auth" },
+  { value: "submission", label: "Submissions" },
+  { value: "revision",   label: "Revisions" },
+  { value: "user",       label: "User management" },
+  { value: "project",    label: "Projects" },
+  { value: "settings",   label: "Settings" },
+  { value: "backup",     label: "Backups" },
+  { value: "report",     label: "Reports" },
+  { value: "system",     label: "System" },
+];
 
 export default function ActivityLogPage() {
   const { ready } = useRequireRole(["admin"]);
@@ -40,6 +125,14 @@ export default function ActivityLogPage() {
   const [actionFilter, setActionFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Tick every minute to keep relative times fresh
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  void now; // used implicitly via relativeTime()
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -47,197 +140,284 @@ export default function ActivityLogPage() {
       await logService.refresh();
       toast.success("Activity log refreshed.");
     } catch {
-      toast.error("Failed to refresh logs.");
+      toast.error("Failed to refresh.");
     } finally {
       setRefreshing(false);
     }
   }, []);
 
   const rows = useMemo(() => {
-    // logs are stored newest-first; show newest at top
     return logs.filter((l) => {
       const u = users.find((x) => x.id === l.userId);
-      const matchesQ = q
-        ? ((u?.name ?? "") + l.action + (l.targetType ?? "") + (l.ip ?? ""))
-            .toLowerCase()
-            .includes(q.toLowerCase())
-        : true;
-      const matchesUser = userFilter === "all" || l.userId === userFilter;
-      const matchesAction =
-        actionFilter === "all" ||
-        (actionFilter === "report"
-          ? l.action.startsWith("report.")
-          : ACTION_GROUPS[actionFilter]?.includes(l.action) ?? l.action.startsWith(actionFilter));
-      return matchesQ && matchesUser && matchesAction;
+      if (q) {
+        const hay = [u?.name ?? "", l.action, getMeta(l.action).label, l.targetType ?? "", l.targetId ?? "", l.ip ?? ""]
+          .join(" ").toLowerCase();
+        if (!hay.includes(q.toLowerCase())) return false;
+      }
+      if (userFilter !== "all" && l.userId !== userFilter) return false;
+      if (actionFilter !== "all") {
+        const group = getMeta(l.action).group;
+        if (group !== actionFilter && !l.action.startsWith(actionFilter + ".")) return false;
+      }
+      return true;
     });
   }, [logs, users, q, userFilter, actionFilter]);
+
+  useEffect(() => { setPage(1); }, [q, userFilter, actionFilter]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [q, userFilter, actionFilter]);
+  // Stats
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayCount = logs.filter((l) => new Date(l.createdAt) >= todayStart).length;
+  const uniqueUsers = new Set(logs.filter((l) => {
+    const d = new Date(l.createdAt);
+    return (Date.now() - d.getTime()) < 7 * 86400_000;
+  }).map((l) => l.userId)).size;
+  const lastEvent = logs[0];
 
   const exportCsv = () => {
     downloadBlob(
       "activity_log.csv",
-      toCsv(
-        rows.map((l) => ({
-          Time: l.createdAt,
-          User: users.find((u) => u.id === l.userId)?.name ?? "",
-          Action: l.action,
-          Target: l.targetType ?? "",
-          TargetId: l.targetId ?? "",
-          IP: l.ip ?? "",
-          UA: l.userAgent ?? "",
-        }))
-      ),
+      toCsv(rows.map((l) => ({
+        Time: l.createdAt,
+        User: users.find((u) => u.id === l.userId)?.name ?? "",
+        Action: l.action,
+        Label: getMeta(l.action).label,
+        Target: l.targetType ?? "",
+        TargetId: l.targetId ?? "",
+        IP: l.ip ?? "",
+      }))),
       "text/csv"
     );
   };
 
-  const actionBadgeVariant = (action: string): "default" | "success" | "warning" | "danger" | "info" | "muted" => {
-    if (action.startsWith("auth.")) return "muted";
-    if (action.startsWith("submission.")) return "info";
-    if (action.startsWith("revision.")) return "warning";
-    if (action.startsWith("user.")) return "warning";
-    if (action.startsWith("project.")) return "default";
-    if (action.startsWith("settings.")) return "warning";
-    if (action.startsWith("backup.")) return "danger";
-    if (action.startsWith("report.")) return "muted";
-    if (action.startsWith("db.")) return "danger";
-    return "muted";
-  };
-
   if (!ready) return null;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Activity Log"
-        description="Audit trail of every action taken in the workspace."
+        description="Full audit trail of every action in the workspace."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={refresh} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
+            <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
-            <Button variant="outline" onClick={exportCsv}>
-              <Download className="h-4 w-4" /> Export CSV
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export CSV</span>
             </Button>
           </div>
         }
       />
+
+      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total events</p>
+                <p className="mt-1 text-2xl font-semibold">{logs.length.toLocaleString()}</p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                <Activity className="h-5 w-5 text-blue-500" />
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Today</p>
+                <p className="mt-1 text-2xl font-semibold">{todayCount}</p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
+                <ClipboardCheck className="h-5 w-5 text-emerald-500" />
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Active users (7d)</p>
+                <p className="mt-1 text-2xl font-semibold">{uniqueUsers}</p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50">
+                <Users className="h-5 w-5 text-violet-500" />
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Last activity</p>
+                <p className="mt-1 text-sm font-medium leading-tight">
+                  {lastEvent ? relativeTime(lastEvent.createdAt) : "—"}
+                </p>
+                {lastEvent && (
+                  <p className="text-xs text-ink-muted">{getMeta(lastEvent.action).label}</p>
+                )}
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+                <Activity className="h-5 w-5 text-amber-500" />
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Filters ───────────────────────────────────────────────────────── */}
       <Card>
-        <CardContent className="space-y-4">
-          {/* Filters row */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="relative flex-1 min-w-0 sm:min-w-52">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
               <Input
                 className="pl-9"
-                placeholder="Search user, action, target, or IP…"
+                placeholder="Search user, action, IP…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
             </div>
             <Select value={userFilter} onValueChange={setUserFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="All users" />
-              </SelectTrigger>
+              <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="All users" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
+                {users.filter((u) => u.isActive).map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={actionFilter} onValueChange={setActionFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="All actions" />
-              </SelectTrigger>
+              <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="All actions" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All actions</SelectItem>
-                <SelectItem value="auth">Auth (login/logout)</SelectItem>
-                <SelectItem value="submission">Submissions</SelectItem>
-                <SelectItem value="revision">Revisions</SelectItem>
-                <SelectItem value="user">User management</SelectItem>
-                <SelectItem value="project">Projects</SelectItem>
-                <SelectItem value="settings">Settings changes</SelectItem>
-                <SelectItem value="report">Reports</SelectItem>
-                <SelectItem value="backup">Backups</SelectItem>
+                {ACTION_GROUPS.map((g) => (
+                  <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {(q || userFilter !== "all" || actionFilter !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setQ(""); setUserFilter("all"); setActionFilter("all"); }}
+                className="text-ink-muted"
+              >
+                Clear filters
+              </Button>
+            )}
           </div>
-
-          {/* Stats row */}
-          <p className="text-xs text-ink-muted">
-            {rows.length} matching event{rows.length !== 1 ? "s" : ""}
-            {logs.length > 0 && ` · ${logs.length} total in cache`}
+          <p className="mt-3 text-xs text-ink-muted">
+            Showing <span className="font-medium text-ink">{rows.length.toLocaleString()}</span> event{rows.length !== 1 ? "s" : ""}
+            {logs.length !== rows.length && ` of ${logs.length.toLocaleString()} total`}
           </p>
-
-          <div className="overflow-x-auto">
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Time</TH>
-                  <TH>User</TH>
-                  <TH>Action</TH>
-                  <TH>Target</TH>
-                  <TH>IP</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {pageRows.map((l) => {
-                  const u = users.find((x) => x.id === l.userId);
-                  return (
-                    <TR key={l.id}>
-                      <TD className="text-ink-muted whitespace-nowrap">
-                        {fmtDate(l.createdAt, "MMM dd, hh:mm:ss a")}
-                      </TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          {u && (
-                            <Avatar className="h-6 w-6 text-[10px]">
-                              <AvatarFallback className={u.avatarColor}>
-                                {initials(u.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                          )}
-                          <span>{u?.name ?? <span className="text-ink-muted italic">system</span>}</span>
-                        </div>
-                      </TD>
-                      <TD>
-                        <Badge variant={actionBadgeVariant(l.action)}>
-                          {l.action}
-                        </Badge>
-                      </TD>
-                      <TD className="text-xs text-ink-muted">
-                        {l.targetType ? `${l.targetType}:${l.targetId ?? "—"}` : "—"}
-                      </TD>
-                      <TD className="text-xs text-ink-muted font-mono">{l.ip ?? "—"}</TD>
-                    </TR>
-                  );
-                })}
-                {rows.length === 0 && (
-                  <TR>
-                    <TD colSpan={5} className="text-center text-ink-muted py-8">
-                      No matching log entries found.
-                    </TD>
-                  </TR>
-                )}
-              </TBody>
-            </Table>            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={rows.length}
-              pageSize={PAGE_SIZE}
-              onPageChange={(p) => setPage(p)}
-            />          </div>
         </CardContent>
       </Card>
+
+      {/* ── Feed ──────────────────────────────────────────────────────────── */}
+      {rows.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-subtle">
+              <Activity className="h-6 w-6 text-ink-soft" />
+            </div>
+            <p className="font-medium text-ink">No events found</p>
+            <p className="mt-1 text-sm text-ink-muted">Try adjusting your search or filters.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-surface-border">
+              {pageRows.map((l, i) => {
+                const u = users.find((x) => x.id === l.userId);
+                const meta = getMeta(l.action);
+                const target = targetLabel(l, users);
+                return (
+                  <li
+                    key={l.id}
+                    className={cn(
+                      "flex items-start gap-4 px-5 py-4 transition hover:bg-surface-subtle",
+                      i === 0 && "rounded-t-xl"
+                    )}
+                  >
+                    {/* Icon */}
+                    <span className={cn("mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg", meta.bg)}>
+                      <meta.Icon className={cn("h-4 w-4", meta.text)} />
+                    </span>
+
+                    {/* Main content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {/* Actor */}
+                        <div className="flex items-center gap-1.5">
+                          {u ? (
+                            <Avatar className="h-5 w-5 text-[9px]">
+                              <AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback>
+                            </Avatar>
+                          ) : null}
+                          <span className="text-sm font-medium">
+                            {u?.name ?? <span className="italic text-ink-muted">system</span>}
+                          </span>
+                        </div>
+
+                        {/* Action label */}
+                        <span className="text-sm text-ink">{meta.label}</span>
+
+                        {/* Target */}
+                        {target && (
+                          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-xs text-ink-muted">
+                            {target}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sub-row: raw action key + IP */}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <Badge variant={meta.badgeVariant} className="text-[10px] px-1.5 py-0">
+                          {l.action}
+                        </Badge>
+                        {l.ip && (
+                          <span className="font-mono text-[11px] text-ink-muted">{l.ip}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Timestamp */}
+                    <div className="flex-shrink-0 text-right">
+                      <p
+                        className="text-sm text-ink-muted"
+                        title={fmtDate(l.createdAt, "MMM dd, yyyy 'at' hh:mm:ss a")}
+                      >
+                        {relativeTime(l.createdAt)}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-ink-soft">
+                        {fmtDate(l.createdAt, "MMM dd, hh:mm a")}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Pagination ────────────────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <Pagination page={safePage} totalPages={totalPages} totalItems={rows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+      )}
     </div>
   );
 }
-
