@@ -18,7 +18,7 @@ export default function BackupsPage() {
   const backups = useDataStore((s) => s.backups);
   const [open, setOpen] = useState(false);
 
-  const last = backups[backups.length - 1];
+  const last = backups[0];
   const success = backups.filter((b) => b.status === "completed").length;
   if (!ready) return null;
 

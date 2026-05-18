@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useDataStore } from "@/store/dataStore";
@@ -14,6 +14,9 @@ import { RevisionDecisionModal } from "@/components/modals/RevisionDecisionModal
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { useRequireRole } from "@/hooks/useAuth";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 export default function RevisionsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
@@ -22,6 +25,7 @@ export default function RevisionsPage() {
   const users = useDataStore((s) => s.users);
   const [decision, setDecision] = useState<{ id: string; mode: "approve" | "reject" } | null>(null);
   const [tab, setTab] = useState<"pending" | "approved" | "rejected">("pending");
+  const [page, setPage] = useState(1);
 
   const grouped = useMemo(() => ({
     pending: revisions.filter((r) => r.status === "pending"),
@@ -30,6 +34,11 @@ export default function RevisionsPage() {
   }), [revisions]);
 
   const rows = grouped[tab];
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [tab]);
 
   if (!ready) return null;
   return (
@@ -56,7 +65,7 @@ export default function RevisionsPage() {
                 <Table>
                   <THead><TR><TH>Employee</TH><TH>Submission date</TH><TH>Reason</TH><TH>Requested</TH><TH /></TR></THead>
                   <TBody>
-                    {rows.map((r) => {
+                    {pageRows.map((r) => {
                       const sub = submissions.find((s) => s.id === r.submissionId);
                       const u = users.find((x) => x.id === sub?.userId);
                       return (
@@ -90,6 +99,13 @@ export default function RevisionsPage() {
                   </TBody>
                 </Table>
               )}
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={(p) => setPage(p)}
+              />
             </CardContent>
           </Card>
         </TabsContent>

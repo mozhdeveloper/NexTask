@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { logService } from "@/services/log.service";
 import { toast } from "sonner";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 50;
 
 const ACTION_GROUPS: Record<string, string[]> = {
   "auth": ["auth.login", "auth.logout"],
@@ -36,6 +39,7 @@ export default function ActivityLogPage() {
   const [userFilter, setUserFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -67,6 +71,12 @@ export default function ActivityLogPage() {
       return matchesQ && matchesUser && matchesAction;
     });
   }, [logs, users, q, userFilter, actionFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [q, userFilter, actionFilter]);
 
   const exportCsv = () => {
     downloadBlob(
@@ -163,7 +173,7 @@ export default function ActivityLogPage() {
 
           {/* Stats row */}
           <p className="text-xs text-ink-muted">
-            Showing {Math.min(rows.length, 200)} of {rows.length} matching events
+            {rows.length} matching event{rows.length !== 1 ? "s" : ""}
             {logs.length > 0 && ` · ${logs.length} total in cache`}
           </p>
 
@@ -179,7 +189,7 @@ export default function ActivityLogPage() {
                 </TR>
               </THead>
               <TBody>
-                {rows.slice(0, 200).map((l) => {
+                {pageRows.map((l) => {
                   const u = users.find((x) => x.id === l.userId);
                   return (
                     <TR key={l.id}>
@@ -218,8 +228,13 @@ export default function ActivityLogPage() {
                   </TR>
                 )}
               </TBody>
-            </Table>
-          </div>
+            </Table>            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={rows.length}
+              pageSize={PAGE_SIZE}
+              onPageChange={(p) => setPage(p)}
+            />          </div>
         </CardContent>
       </Card>
     </div>

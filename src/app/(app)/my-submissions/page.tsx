@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,9 @@ import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 import { downloadBlob, toCsv } from "@/lib/helpers";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 export default function MySubmissionsPage() {
   const user = useAuth();
@@ -28,6 +31,7 @@ export default function MySubmissionsPage() {
   const [open, setOpen] = useState(false);
   const [revOpen, setRevOpen] = useState(false);
   const [revFor, setRevFor] = useState<string>("");
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     if (!user) return [];
@@ -37,6 +41,12 @@ export default function MySubmissionsPage() {
       .filter((s) => (q ? (s.workSummary + " " + s.tasksDetails).toLowerCase().includes(q.toLowerCase()) : true))
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [user, submissions, status, q]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [q, status]);
 
   const exportCsv = () => {
     const data = rows.map((r) => ({
@@ -86,7 +96,7 @@ export default function MySubmissionsPage() {
             <Table>
               <THead><TR><TH>Date</TH><TH>Summary</TH><TH>Status</TH><TH>Submitted</TH><TH>v</TH><TH /></TR></THead>
               <TBody>
-                {rows.map((s) => (
+                {pageRows.map((s) => (
                   <TR key={s.id}>
                     <TD>{fmtDate(s.date)}</TD>
                     <TD className="max-w-md truncate">{s.workSummary}</TD>
@@ -109,6 +119,13 @@ export default function MySubmissionsPage() {
               </TBody>
             </Table>
           )}
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={rows.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setPage(p)}
+          />
         </CardContent>
       </Card>
       <SubmissionDetailsModal open={open} onOpenChange={setOpen} submission={selected} />

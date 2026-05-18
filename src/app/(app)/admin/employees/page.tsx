@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ import { toast } from "sonner";
 import type { User } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRequireRole } from "@/hooks/useAuth";
+import { Pagination } from "@/components/ui/pagination";
+
+const PAGE_SIZE = 20;
 
 export default function EmployeesPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
@@ -28,12 +31,19 @@ export default function EmployeesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [confirm, setConfirm] = useState<User | null>(null);
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() =>
     users
       .filter((u) => (dept === "all" ? true : u.departmentId === dept))
       .filter((u) => (q ? (u.name + u.email).toLowerCase().includes(q.toLowerCase()) : true)),
     [users, q, dept]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [q, dept]);
 
   if (!ready) return null;
   return (
@@ -61,7 +71,7 @@ export default function EmployeesPage() {
           <Table>
             <THead><TR><TH>Employee</TH><TH>Role</TH><TH>Department</TH><TH>Status</TH><TH /></TR></THead>
             <TBody>
-              {rows.map((u) => {
+              {pageRows.map((u) => {
                 const d = departments.find((x) => x.id === u.departmentId);
                 return (
                   <TR key={u.id}>
@@ -98,6 +108,13 @@ export default function EmployeesPage() {
               })}
             </TBody>
           </Table>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={rows.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setPage(p)}
+          />
         </CardContent>
       </Card>
       <EmployeeFormModal open={open} onOpenChange={setOpen} editing={editing} />

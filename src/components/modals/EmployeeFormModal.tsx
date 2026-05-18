@@ -19,6 +19,7 @@ const schema = z.object({
   jobTitle: z.string().optional(),
   role: z.enum(["admin", "manager", "employee"]),
   departmentId: z.string().min(1),
+  password: z.string().optional(),
 });
 type V = z.infer<typeof schema>;
 
@@ -37,7 +38,7 @@ export function EmployeeFormModal({
     resolver: zodResolver(schema),
     defaultValues: editing
       ? { name: editing.name, email: editing.email, jobTitle: editing.jobTitle ?? "", role: editing.role, departmentId: editing.departmentId ?? (departments[0]?.id ?? "") }
-      : { name: "", email: "", jobTitle: "", role: "employee", departmentId: departments[0]?.id ?? "" },
+      : { name: "", email: "", jobTitle: "", role: "employee", departmentId: departments[0]?.id ?? "", password: "" },
   });
 
   const submit = async (v: V) => {
@@ -47,7 +48,7 @@ export function EmployeeFormModal({
         await userService.update(editing.id, v);
         toast.success("Employee updated.");
       } else {
-        await userService.create(v);
+        await userService.create({ ...v, password: v.password?.trim() || undefined });
         toast.success("Employee added.");
       }
       reset();
@@ -71,6 +72,13 @@ export function EmployeeFormModal({
             <div className="space-y-1.5"><Label>Name</Label><Input {...register("name")} />{errors.name && <p className="text-xs text-danger">{errors.name.message}</p>}</div>
             <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...register("email")} />{errors.email && <p className="text-xs text-danger">{errors.email.message}</p>}</div>
             <div className="space-y-1.5"><Label>Job title</Label><Input {...register("jobTitle")} /></div>
+            {!editing && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Password</Label>
+                <Input type="password" placeholder="Leave blank to use default (password123)" {...register("password")} />
+                <p className="text-xs text-ink-muted">Minimum 8 characters. Employee must change it after first login.</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Role</Label>
               <Select value={watch("role")} onValueChange={(v) => setValue("role", v as Role)}>

@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Input } from "@/components/ui/input";
@@ -22,8 +22,10 @@ import { useRequireRole } from "@/hooks/useAuth";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 import { toast } from "sonner";
+import { Pagination } from "@/components/ui/pagination";
 
 const STATUSES: SubmissionStatus[] = ["submitted", "late", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
+const PAGE_SIZE = 20;
 
 export default function AdminSubmissionsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
@@ -41,6 +43,7 @@ export default function AdminSubmissionsPage() {
   const [overrideTarget, setOverrideTarget] = useState<Submission | null>(null);
   const [overrideStatus, setOverrideStatus] = useState<SubmissionStatus>("submitted");
   const [holidayDate, setHolidayDate] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const rows = useMemo(() => {
     return submissions
@@ -58,6 +61,13 @@ export default function AdminSubmissionsPage() {
       })
       .sort((a, b) => (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""));
   }, [submissions, users, status, dept, q, date]);
+
+  // Reset to page 1 whenever filters change
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [status, dept, q, date]);
 
   const exportCsv = () => {
     const data = rows.map((r) => {
@@ -134,7 +144,7 @@ export default function AdminSubmissionsPage() {
               </TR>
             </THead>
             <TBody>
-              {rows.map((s) => {
+              {pageRows.map((s) => {
                 const u = users.find((x) => x.id === s.userId);
                 const isHolidayRow = workSettings.holidays.some((h) => h.date === s.date);
                 return (
@@ -184,6 +194,13 @@ export default function AdminSubmissionsPage() {
               )}
             </TBody>
           </Table>
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={rows.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={(p) => setPage(p)}
+          />
         </CardContent>
       </Card>
 

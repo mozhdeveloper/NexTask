@@ -94,8 +94,15 @@ export const useDataStore = create<DataState>()(
     }),
     {
       name: `${STORAGE_PREFIX}data`,
-      version: 1,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
+      // Only persist lightweight settings — bulk data (submissions, logs, users etc.)
+      // is always fetched fresh from Supabase on boot, so storing it in localStorage
+      // wastes quota (5 MB limit) and causes stale-data flickering.
+      partialize: (state) => ({
+        workSettings: state.workSettings,
+        autoBackupSettings: state.autoBackupSettings,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrated = true;
       },

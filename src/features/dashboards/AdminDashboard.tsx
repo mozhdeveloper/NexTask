@@ -59,7 +59,10 @@ export default function AdminDashboard() {
   const todayDate = new Date();
   todayDate.setHours(23, 59, 59, 999);
   const weekWorkingDays = workSettingsService.countWorkingDays(startOfThisWeek, todayDate);
-  const weekSubmissions = submissions.filter(s => new Date(s.date) >= startOfThisWeek && s.locked).length;
+  const employeeIds = new Set(employees.map((e) => e.id));
+  const weekSubmissions = submissions.filter(
+    (s) => new Date(s.date) >= startOfThisWeek && s.locked && employeeIds.has(s.userId)
+  ).length;
 
   const days = range === "30d" ? 30 : range === "14d" ? 14 : 7;
   const lineData = useMemo(() => {
