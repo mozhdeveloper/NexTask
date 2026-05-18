@@ -121,7 +121,7 @@ export default function AdminDashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard icon={Users} label="Total Employees" value={employees.length} sublabel="active" tint="indigo" />
         <StatCard icon={ClipboardList} label="Today's Submissions" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
         <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="awaiting" tint="amber" />
@@ -169,11 +169,12 @@ export default function AdminDashboard() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle>Recent Submissions</CardTitle>
             <Button asChild variant="ghost" size="sm"><Link href="/admin/submissions">View all</Link></Button>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto -mx-2 px-2">
             <Table>
               <THead><TR><TH>Employee</TH><TH>Date</TH><TH>Status</TH><TH>At</TH></TR></THead>
               <TBody>
@@ -195,6 +196,7 @@ export default function AdminDashboard() {
                 })}
               </TBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -217,15 +219,14 @@ export default function AdminDashboard() {
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>Overdue Submissions</CardTitle>
           <Button size="sm" onClick={sendReminders}><Bell className="h-4 w-4" /> Send reminders</Button>
         </CardHeader>
         <CardContent>
           {overdueRows.length === 0 ? (
             <div className="py-8 text-center text-sm text-ink-muted">No overdue submissions today 🎉</div>
-          ) : (
-            <Table>
+          ) : (            <div className="overflow-x-auto -mx-2 px-2">            <Table>
               <THead><TR><TH>Employee</TH><TH>Department</TH><TH>Due</TH><TH>Status</TH></TR></THead>
               <TBody>
                 {overdueRows.map((s) => {
@@ -247,6 +248,7 @@ export default function AdminDashboard() {
                 })}
               </TBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

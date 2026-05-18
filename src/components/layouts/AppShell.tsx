@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
@@ -30,20 +30,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Sidebar — fixed overlay on mobile, inline on desktop */}
+      {/* Sidebar — fixed overlay on mobile, sticky flex column on desktop */}
       <div
         className={cn(
           "fixed inset-y-0 left-0 z-50 transition-transform duration-200 ease-in-out",
-          "lg:relative lg:z-auto lg:translate-x-0 lg:transition-none",
+          "lg:relative lg:z-auto lg:translate-x-0 lg:transition-none lg:flex-shrink-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         <Sidebar collapsed={collapsed} onClose={() => setMobileOpen(false)} />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header onToggleSidebar={handleToggle} />
-        <main className="flex-1 overflow-x-hidden bg-surface-subtle">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-surface-subtle">
           <div className="mx-auto max-w-[1440px] p-4 md:p-6">{children}</div>
         </main>
       </div>

@@ -40,7 +40,7 @@ export default function EmployeeDashboard() {
         description="Here’s your daily snapshot. Submit your work and track your weekly compliance."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         <StatCard
           icon={ClipboardCheck}
           label="Today's Status"
@@ -105,6 +105,7 @@ export default function EmployeeDashboard() {
               description="Submit your first daily work above to see it here."
             />
           ) : (
+            <div className="overflow-x-auto -mx-2 px-2">
             <Table>
               <THead>
                 <TR>
@@ -136,6 +137,7 @@ export default function EmployeeDashboard() {
                 ))}
               </TBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
