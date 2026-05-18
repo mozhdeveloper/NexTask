@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/layouts/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ExportReportModal } from "@/components/modals/ExportReportModal";
 import type { ReportType } from "@/services/report.service";
+import { useRequireRole } from "@/hooks/useAuth";
 
 const reports: Array<{ type: ReportType; title: string; description: string; icon: React.ElementType; tint: string }> = [
   { type: "daily", title: "Daily Submissions", description: "Today’s submissions with status, author, and timestamp.", icon: CalendarDays, tint: "bg-chip-teal" },
@@ -25,7 +26,9 @@ const reports: Array<{ type: ReportType; title: string; description: string; ico
 ];
 
 export default function ReportsPage() {
+  const { ready } = useRequireRole(["admin", "manager"]);
   const [picked, setPicked] = useState<ReportType | null>(null);
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader title="Reports" description="Generate and export compliance reports for the office." />

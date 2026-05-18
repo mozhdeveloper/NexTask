@@ -255,6 +255,7 @@ export const submissionService = {
 
   markStatus(id: string, status: Submission["status"]) {
     const me = useAuthStore.getState().user;
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
     const { submissions, setSubmissions } = useDataStore.getState();
     setSubmissions(submissions.map((s) => (s.id === id ? { ...s, status } : s)));
     supabase

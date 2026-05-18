@@ -29,7 +29,7 @@ export const userService = {
     }
   ) {
     const me = useAuthStore.getState().user;
-    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
 
     const res = await fetch("/api/users", {
       method: "POST",
@@ -57,7 +57,7 @@ export const userService = {
 
   async update(id: string, patch: Partial<User>) {
     const me = useAuthStore.getState().user;
-    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
 
     const { users, setUsers } = useDataStore.getState();
     setUsers(users.map((u) => (u.id === id ? { ...u, ...patch } : u)));
@@ -86,7 +86,7 @@ export const userService = {
 
   async toggleActive(id: string) {
     const me = useAuthStore.getState().user;
-    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
     const { users, setUsers } = useDataStore.getState();
     const target = users.find((u) => u.id === id);
     if (!target) return;

@@ -78,7 +78,7 @@ export const revisionService = {
 
   async approve(revisionId: string, note?: string) {
     const me = useAuthStore.getState().user;
-    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
     const { revisions, setRevisions, submissions, setSubmissions } = useDataStore.getState();
     const r = revisions.find((x) => x.id === revisionId);
     if (!r) throw new Error("Not found");
@@ -132,7 +132,7 @@ export const revisionService = {
 
   async reject(revisionId: string, note: string) {
     const me = useAuthStore.getState().user;
-    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
     const { revisions, setRevisions, submissions, setSubmissions } = useDataStore.getState();
     const r = revisions.find((x) => x.id === revisionId);
     if (!r) throw new Error("Not found");

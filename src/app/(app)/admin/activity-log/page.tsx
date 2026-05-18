@@ -29,7 +29,7 @@ const ACTION_GROUPS: Record<string, string[]> = {
 };
 
 export default function ActivityLogPage() {
-  useRequireRole(["admin"]);
+  const { ready } = useRequireRole(["admin"]);
   const logs = useDataStore((s) => s.logs);
   const users = useDataStore((s) => s.users);
   const [q, setQ] = useState("");
@@ -99,6 +99,7 @@ export default function ActivityLogPage() {
     return "muted";
   };
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader

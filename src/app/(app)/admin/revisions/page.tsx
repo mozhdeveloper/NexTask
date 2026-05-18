@@ -16,7 +16,7 @@ import { useRequireRole } from "@/hooks/useAuth";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export default function RevisionsPage() {
-  useRequireRole(["admin", "manager"]);
+  const { ready } = useRequireRole(["admin", "manager"]);
   const revisions = useDataStore((s) => s.revisions);
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
@@ -31,6 +31,7 @@ export default function RevisionsPage() {
 
   const rows = grouped[tab];
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader title="Revision Requests" description="Review and act on employee revision requests." />

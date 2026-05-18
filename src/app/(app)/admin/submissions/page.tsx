@@ -26,7 +26,7 @@ import { toast } from "sonner";
 const STATUSES: SubmissionStatus[] = ["submitted", "late", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
 
 export default function AdminSubmissionsPage() {
-  useRequireRole(["admin", "manager"]);
+  const { ready } = useRequireRole(["admin", "manager"]);
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
@@ -68,6 +68,7 @@ export default function AdminSubmissionsPage() {
     toast.success("Exported submissions.csv");
   };
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader

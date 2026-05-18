@@ -24,12 +24,13 @@ const STATUS_VARIANTS: Record<Project["status"], "info" | "warning" | "success" 
 };
 
 export default function ProjectsPage() {
-  useRequireRole(["admin", "manager"]);
+  const { ready } = useRequireRole(["admin", "manager"]);
   const projects = useDataStore((s) => s.projects);
   const users = useDataStore((s) => s.users);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader

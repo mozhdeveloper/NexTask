@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRequireRole } from "@/hooks/useAuth";
 
 export default function EmployeesPage() {
-  useRequireRole(["admin", "manager"]);
+  const { ready } = useRequireRole(["admin", "manager"]);
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
   const [q, setQ] = useState("");
@@ -35,6 +35,7 @@ export default function EmployeesPage() {
       .filter((u) => (q ? (u.name + u.email).toLowerCase().includes(q.toLowerCase()) : true)),
     [users, q, dept]);
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader

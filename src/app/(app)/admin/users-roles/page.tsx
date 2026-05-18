@@ -28,7 +28,7 @@ function Cell({ allowed }: { allowed: boolean }) {
 }
 
 export default function UsersRolesPage() {
-  useRequireRole(["admin"]);
+  const { ready } = useRequireRole(["admin"]);
   const users = useDataStore((s) => s.users);
   const counts = {
     admin: users.filter((u) => u.role === "admin" && u.isActive).length,
@@ -36,6 +36,7 @@ export default function UsersRolesPage() {
     employee: users.filter((u) => u.role === "employee" && u.isActive).length,
   };
 
+  if (!ready) return null;
   return (
     <div className="space-y-6">
       <PageHeader title="Users & Roles" description="Roles define what each member can access in the workspace." />

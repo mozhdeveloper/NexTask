@@ -232,6 +232,7 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      {user?.role === "admin" && (
       <Card>
         <CardHeader>
           <CardTitle>Demo data</CardTitle>
@@ -246,6 +247,7 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
       <ConfirmModal
         open={confirmReset}

@@ -16,6 +16,8 @@ export default function CalendarPage() {
   const [cursor, setCursor] = useState(new Date());
   const [picked, setPicked] = useState<Date | null>(null);
 
+  if (!user) return null;
+
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(cursor));
     const end = endOfWeek(endOfMonth(cursor));

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import type { Role } from "@/lib/constants";
@@ -30,10 +30,12 @@ export function useRequireRole(roles: Role[]) {
   const router = useRouter();
   const user = useAuth();
   const hydrated = useHydrated();
+  // Freeze roles on first render — callers always pass a literal array
+  const rolesRef = useRef(roles);
   useEffect(() => {
     if (!hydrated) return;
     if (!user) router.replace("/login");
-    else if (!roles.includes(user.role)) router.replace("/dashboard");
-  }, [hydrated, user, roles, router]);
-  return { user, ready: hydrated && !!user && (user ? roles.includes(user.role) : false) };
+    else if (!rolesRef.current.includes(user.role)) router.replace("/dashboard");
+  }, [hydrated, user, router]);
+  return { user, ready: hydrated && !!user && (user ? rolesRef.current.includes(user.role) : false) };
 }

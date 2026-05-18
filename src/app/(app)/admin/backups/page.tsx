@@ -13,12 +13,13 @@ import { useRequireRole } from "@/hooks/useAuth";
 import { StatCard } from "@/components/cards/StatCard";
 
 export default function BackupsPage() {
-  useRequireRole(["admin"]);
+  const { ready } = useRequireRole(["admin"]);
   const backups = useDataStore((s) => s.backups);
   const [open, setOpen] = useState(false);
 
   const last = backups[backups.length - 1];
   const success = backups.filter((b) => b.status === "completed").length;
+  if (!ready) return null;
 
   return (
     <div className="space-y-6">
