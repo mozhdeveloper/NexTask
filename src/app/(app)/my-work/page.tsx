@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SubmitWorkForm } from "@/components/forms/SubmitWorkForm";
 import { PageHeader } from "@/components/layouts/PageHeader";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useRequireRole } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { fmtDate, fmtTime, todayISO } from "@/lib/dates";
@@ -12,11 +12,12 @@ import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsMod
 import type { Submission } from "@/types";
 
 export default function MyWorkPage() {
+  const { ready } = useRequireRole(["employee"]);
   const user = useAuth();
   const submissions = useDataStore((s) => s.submissions);
   const [selected, setSelected] = useState<Submission | null>(null);
   const [open, setOpen] = useState(false);
-  if (!user) return null;
+  if (!ready || !user) return null;
   const today = todayISO();
   const recent = submissions.filter((s) => s.userId === user.id).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
   return (

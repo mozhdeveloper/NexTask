@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useRequireRole } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { fmtDate, fmtTime } from "@/lib/dates";
@@ -23,6 +23,7 @@ import { Pagination } from "@/components/ui/pagination";
 const PAGE_SIZE = 20;
 
 export default function MySubmissionsPage() {
+  const { ready } = useRequireRole(["employee"]);
   const user = useAuth();
   const submissions = useDataStore((s) => s.submissions);
   const [q, setQ] = useState("");
@@ -60,7 +61,7 @@ export default function MySubmissionsPage() {
     downloadBlob("my_submissions.csv", toCsv(data), "text/csv");
   };
 
-  if (!user) return null;
+  if (!ready || !user) return null;
   return (
     <div className="space-y-6">
       <PageHeader
