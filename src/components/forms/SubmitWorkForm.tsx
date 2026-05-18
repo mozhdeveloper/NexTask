@@ -1,18 +1,24 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { UploadCloud, X, FileText } from "lucide-react";
+import { UploadCloud, X, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { submissionService } from "@/services/submission.service";
 import { useDataStore } from "@/store/dataStore";
 import { useAuth } from "@/hooks/useAuth";
 import { fmtBytes } from "@/lib/dates";
 import { todayISO } from "@/lib/dates";
-import { ALLOWED_FILE_TYPES, MAX_FILE_SIZE_MB } from "@/lib/constants";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -29,8 +35,22 @@ export function SubmitWorkForm({
   defaultDate?: string;
 }) {
   const user = useAuth();
-  const submissionTypes = useDataStore((s) => s.submissionTypes);
-  const dailyType = submissionTypes.find((t) => t.id === "st_daily");
+  const allTypes = useDataStore((s) => s.submissionTypes);
+
+  // Filter to active types that match the user's department (or apply to all)
+  const availableTypes = useMemo(
+    () =>
+      allTypes.filter(
+        (t) =>
+          t.isActive &&
+          (t.departmentId === null || t.departmentId === (user?.departmentId ?? null))
+      ),
+    [allTypes, user?.departmentId]
+  );
+
+  const [selectedTypeId, setSelectedTypeId] = useState<string>(() => availableTypes[0]?.id ?? "");
+  const selectedType = availableTypes.find((t) => t.id === selectedTypeId) ?? availableTypes[0] ?? null;
+
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -55,16 +75,52 @@ export function SubmitWorkForm({
 
   const locked = !!existing?.locked;
 
+  // Client-side file validation using the selected type's rules
+  const addFiles = (incoming: File[]) => {
+    if (!selectedType) return;
+    const allowed = selectedType.allowedFileTypes;
+    const maxBytes = selectedType.maxFileSizeMB * 1024 * 1024;
+    const rejected: string[] = [];
+    const accepted: File[] = [];
+
+    for (const f of incoming) {
+      const ext = (f.name.split(".").pop() ?? "").toLowerCase();
+      if (!allowed.includes(ext)) {
+        rejected.push(`${f.name} — .${ext} not allowed`);
+      } else if (f.size > maxBytes) {
+        rejected.push(`${f.name} — exceeds ${selectedType.maxFileSizeMB} MB`);
+      } else {
+        accepted.push(f);
+      }
+    }
+
+    if (rejected.length > 0) {
+      toast.error(
+        <div>
+          <p className="font-medium">Some files were rejected:</p>
+          <ul className="mt-1 list-disc pl-4 text-xs">
+            {rejected.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    if (accepted.length > 0) {
+      setFiles((prev) => [...prev, ...accepted]);
+    }
+  };
+
   const onSubmit = async (v: FormValues) => {
-    if (!dailyType) {
-      toast.error("Submission type not loaded. Please refresh the page.");
+    if (!selectedType) {
+      toast.error("Please select a submission type.");
       return;
     }
     setBusy(true);
     try {
       await submissionService.create({
         date: v.date,
-        submissionTypeId: dailyType.id,
+        submissionTypeId: selectedType.id,
         workSummary: v.workSummary,
         tasksDetails: v.tasksDetails ?? "",
         files,
@@ -80,8 +136,47 @@ export function SubmitWorkForm({
     }
   };
 
+  if (availableTypes.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-ink-muted">
+        <AlertCircle className="h-8 w-8 opacity-40" />
+        <p className="text-sm">No active submission types available for your department.</p>
+      </div>
+    );
+  }
+
+  const acceptAttr = selectedType
+    ? selectedType.allowedFileTypes.map((e) => "." + e).join(",")
+    : "*";
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {/* Submission Type */}
+      {availableTypes.length > 1 && (
+        <div className="space-y-1.5">
+          <Label>Submission Type</Label>
+          <Select
+            value={selectedTypeId}
+            onValueChange={(v) => {
+              setSelectedTypeId(v);
+              setFiles([]); // clear files when type changes since rules differ
+            }}
+            disabled={locked}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableTypes.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="date">Date</Label>
         <Input id="date" type="date" {...register("date")} disabled={locked} />
@@ -127,17 +222,22 @@ export function SubmitWorkForm({
                 multiple
                 hidden
                 disabled={locked}
-                accept={ALLOWED_FILE_TYPES.map((e) => "." + e).join(",")}
+                accept={acceptAttr}
                 onChange={(e) => {
-                  const list = Array.from(e.target.files ?? []);
-                  setFiles((prev) => [...prev, ...list]);
+                  addFiles(Array.from(e.target.files ?? []));
                   e.currentTarget.value = "";
                 }}
               />
             </label>
-            <div className="text-[11px] text-ink-muted">
-              {ALLOWED_FILE_TYPES.join(", ").toUpperCase()} (Max {MAX_FILE_SIZE_MB}MB)
-            </div>
+            {selectedType && (
+              <div className="text-right text-[11px] text-ink-muted leading-relaxed">
+                <span className="font-medium">
+                  {selectedType.allowedFileTypes.join(", ").toUpperCase()}
+                </span>
+                <br />
+                Max {selectedType.maxFileSizeMB} MB · Deadline {selectedType.deadlineTime}
+              </div>
+            )}
           </div>
           {files.length > 0 && (
             <ul className="mt-3 space-y-1.5">
@@ -173,7 +273,7 @@ export function SubmitWorkForm({
         ) : (
           <span />
         )}
-        <Button type="submit" disabled={busy || locked}>
+        <Button type="submit" disabled={busy || locked || !selectedType}>
           {existing ? "Update Submission" : "Submit Work"}
         </Button>
       </div>
