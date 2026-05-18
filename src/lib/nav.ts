@@ -13,6 +13,7 @@ import {
   ScrollText,
   HardDrive,
   Inbox,
+  ListChecks,
 } from "lucide-react";
 
 export interface NavItem {
@@ -48,6 +49,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Projects", href: "/admin/projects", icon: FolderKanban },
     { label: "Backups", href: "/admin/backups", icon: HardDrive },
+    { label: "Submission Types", href: "/admin/submission-types", icon: ListChecks },
     { label: "Activity Log", href: "/admin/activity-log", icon: ScrollText },
     { label: "Users & Roles", href: "/admin/users-roles", icon: ShieldCheck },
     { label: "Settings", href: "/settings", icon: Settings },

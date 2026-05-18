@@ -41,6 +41,7 @@ interface DataState {
   hydrated: boolean;
 
   setUsers: (u: User[]) => void;
+  setSubmissionTypes: (t: SubmissionType[]) => void;
   setSubmissions: (s: Submission[]) => void;
   setRevisions: (r: RevisionRequest[]) => void;
   setBackups: (b: BackupLog[]) => void;
@@ -80,6 +81,7 @@ export const useDataStore = create<DataState>()(
       ...initial(),
       hydrated: false,
       setUsers: (users) => set({ users }),
+      setSubmissionTypes: (submissionTypes) => set({ submissionTypes }),
       setSubmissions: (submissions) => set({ submissions }),
       setRevisions: (revisions) => set({ revisions }),
       setBackups: (backups) => set({ backups }),
