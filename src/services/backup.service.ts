@@ -1,54 +1,73 @@
+// Backup service — delegates to /api/backups/run (server-side); refreshes cache after.
+
 import { useDataStore } from "@/store/dataStore";
 import { useAuthStore } from "@/store/authStore";
 import type { BackupLog } from "@/types";
-import { backupFileName, uid } from "@/lib/helpers";
-import { nowISO } from "@/lib/dates";
+import { supabase } from "@/lib/supabase/client";
+import { mapBackupLog } from "@/lib/supabase/mappers";
+import type { DbBackupLogRow } from "@/lib/supabase/types";
 import { logService } from "./log.service";
+
+function warn(label: string, e: unknown) {
+  // eslint-disable-next-line no-console
+  console.warn(`[backup:${label}]`, e);
+}
 
 export const backupService = {
   list() {
     return useDataStore.getState().backups;
   },
+
   async run(onProgress?: (p: number) => void) {
     const me = useAuthStore.getState().user;
     if (!me || me.role !== "admin") throw new Error("Forbidden");
-    const { backups, setBackups } = useDataStore.getState();
-    const id = uid("bk");
-    const fileName = backupFileName();
-    const filePath = `D:\\OfficeSystemStorage\\backups\\${fileName}`;
-    const log: BackupLog = {
-      id,
-      adminId: me.id,
-      fileName,
-      filePath,
-      sizeBytes: 0,
-      startedAt: nowISO(),
-      completedAt: null,
-      createdAt: nowISO(),
-      status: "running",
-    };
-    setBackups([log, ...backups]);
 
-    for (let i = 1; i <= 20; i++) {
-      await new Promise((r) => setTimeout(r, 120));
-      onProgress?.(i * 5);
+    // local progress animation that mirrors the previous UX
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress = Math.min(95, progress + 5);
+      onProgress?.(progress);
+    }, 120);
+
+    try {
+      const res = await fetch("/api/backups/run", { method: "POST" });
+      clearInterval(interval);
+      onProgress?.(100);
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? "Backup failed");
+      }
+      const row = (await res.json()) as DbBackupLogRow;
+      const completed = mapBackupLog(row);
+
+      const { backups, setBackups } = useDataStore.getState();
+      setBackups([completed, ...backups.filter((b) => b.id !== completed.id)]);
+
+      logService.append({
+        userId: me.id,
+        action: "backup.run",
+        targetType: "backup",
+        targetId: completed.id,
+      });
+      return completed;
+    } catch (e) {
+      clearInterval(interval);
+      throw e;
     }
+  },
 
-    const sizeBytes = 25_000_000 + Math.floor(Math.random() * 6_000_000);
-    const completed: BackupLog = {
-      ...log,
-      sizeBytes,
-      completedAt: nowISO(),
-      status: "completed",
-    };
-    const cur = useDataStore.getState().backups;
-    useDataStore.getState().setBackups(cur.map((b) => (b.id === id ? completed : b)));
-    logService.append({
-      userId: me.id,
-      action: "backup.run",
-      targetType: "backup",
-      targetId: id,
-    });
-    return completed;
+  async refresh() {
+    const { data, error } = await supabase
+      .from("backup_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      warn("refresh", error);
+      return;
+    }
+    const mapped: BackupLog[] = (data ?? []).map((r) => mapBackupLog(r as DbBackupLogRow));
+    useDataStore.getState().setBackups(mapped);
   },
 };

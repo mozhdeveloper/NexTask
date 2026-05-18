@@ -1,53 +1,116 @@
+// User service. Most ops are direct Supabase queries.
+// `create` needs an auth.users row → server route /api/users (service_role).
+
 import { useDataStore } from "@/store/dataStore";
 import { useAuthStore } from "@/store/authStore";
 import type { User } from "@/types";
-import { uid } from "@/lib/helpers";
-import { nowISO } from "@/lib/dates";
-import { AVATAR_COLORS } from "@/lib/status";
+import { supabase } from "@/lib/supabase/client";
+import { mapUser } from "@/lib/supabase/mappers";
+import type { DbUserRow } from "@/lib/supabase/types";
 import { logService } from "./log.service";
+
+function warn(label: string, e: unknown) {
+  // eslint-disable-next-line no-console
+  console.warn(`[users:${label}]`, e);
+}
 
 export const userService = {
   list() {
     return useDataStore.getState().users;
   },
+
   get(id: string) {
     return useDataStore.getState().users.find((u) => u.id === id) ?? null;
   },
-  create(input: Omit<User, "id" | "createdAt" | "avatarColor" | "isActive" | "passwordHash"> & { password?: string }) {
+
+  async create(
+    input: Omit<User, "id" | "createdAt" | "avatarColor" | "isActive" | "passwordHash"> & {
+      password?: string;
+    }
+  ) {
     const me = useAuthStore.getState().user;
     if (!me || me.role !== "admin") throw new Error("Forbidden");
+
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? "Failed to create user");
+    }
+    const row = (await res.json()) as DbUserRow;
+    const user = mapUser(row);
+
     const { users, setUsers } = useDataStore.getState();
-    if (users.some((u) => u.email.toLowerCase() === input.email.toLowerCase()))
-      throw new Error("Email already exists");
-    const u: User = {
-      id: uid("u"),
-      passwordHash: input.password || "password123",
-      avatarColor: AVATAR_COLORS[users.length % AVATAR_COLORS.length],
-      isActive: true,
-      createdAt: nowISO(),
-      ...input,
-    };
-    setUsers([u, ...users]);
-    logService.append({ userId: me.id, action: "user.create", targetType: "user", targetId: u.id });
-    return u;
+    setUsers([user, ...users]);
+
+    logService.append({
+      userId: me.id,
+      action: "user.create",
+      targetType: "user",
+      targetId: user.id,
+    });
+    return user;
   },
-  update(id: string, patch: Partial<User>) {
+
+  async update(id: string, patch: Partial<User>) {
     const me = useAuthStore.getState().user;
     if (!me || me.role !== "admin") throw new Error("Forbidden");
+
     const { users, setUsers } = useDataStore.getState();
     setUsers(users.map((u) => (u.id === id ? { ...u, ...patch } : u)));
-    logService.append({ userId: me.id, action: "user.update", targetType: "user", targetId: id });
+
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.email !== undefined) dbPatch.email = patch.email;
+    if (patch.role !== undefined) dbPatch.role = patch.role;
+    if (patch.departmentId !== undefined) dbPatch.department_id = patch.departmentId;
+    if (patch.jobTitle !== undefined) dbPatch.job_title = patch.jobTitle;
+    if (patch.avatarColor !== undefined) dbPatch.avatar_color = patch.avatarColor;
+    if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
+
+    if (Object.keys(dbPatch).length > 0) {
+      const { error } = await supabase.from("users").update(dbPatch).eq("id", id);
+      if (error) warn("update", error);
+    }
+
+    logService.append({
+      userId: me.id,
+      action: "user.update",
+      targetType: "user",
+      targetId: id,
+    });
   },
-  toggleActive(id: string) {
+
+  async toggleActive(id: string) {
     const me = useAuthStore.getState().user;
     if (!me || me.role !== "admin") throw new Error("Forbidden");
     const { users, setUsers } = useDataStore.getState();
-    setUsers(users.map((u) => (u.id === id ? { ...u, isActive: !u.isActive } : u)));
+    const target = users.find((u) => u.id === id);
+    if (!target) return;
+    const next = !target.isActive;
+    setUsers(users.map((u) => (u.id === id ? { ...u, isActive: next } : u)));
+
+    const { error } = await supabase.from("users").update({ is_active: next }).eq("id", id);
+    if (error) warn("toggleActive", error);
+
     logService.append({
       userId: me.id,
       action: "user.toggle_active",
       targetType: "user",
       targetId: id,
     });
+  },
+
+  async refresh() {
+    const { data, error } = await supabase.from("users").select("*").order("name");
+    if (error) {
+      warn("refresh", error);
+      return;
+    }
+    const mapped = (data ?? []).map((r) => mapUser(r as DbUserRow));
+    useDataStore.getState().setUsers(mapped);
   },
 };

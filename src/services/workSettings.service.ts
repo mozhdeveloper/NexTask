@@ -1,17 +1,32 @@
+// Work settings service. Singleton `work_settings` row + holidays table.
+// Pure helpers (isWorkingDay, countWorkingDays) read from the local cache and stay sync.
+
 import { useDataStore } from "@/store/dataStore";
+import { useAuthStore } from "@/store/authStore";
 import type { WorkSettings } from "@/types";
+import { supabase } from "@/lib/supabase/client";
+import { mapWorkSettings, mapAutoBackupSettings } from "@/lib/supabase/mappers";
+import type { DbWorkSettingsRow, DbHolidayRow } from "@/lib/supabase/types";
+import { logService } from "./log.service";
+
+function warn(label: string, e: unknown) {
+  // eslint-disable-next-line no-console
+  console.warn(`[workSettings:${label}]`, e);
+}
+
+function meId() {
+  return useAuthStore.getState().user?.id ?? "system";
+}
 
 export const workSettingsService = {
   get(): WorkSettings {
     return useDataStore.getState().workSettings;
   },
 
-  /** Returns true if the given YYYY-MM-DD is a working day (not a holiday, not a weekend if not configured). */
   isWorkingDay(dateStr: string): boolean {
     const ws = useDataStore.getState().workSettings;
-    // Parse date at noon local to avoid DST shifts
     const date = new Date(dateStr + "T12:00:00");
-    const dow = date.getDay(); // 0=Sun … 6=Sat
+    const dow = date.getDay();
     if (!ws.workingDays.includes(dow)) return false;
     if (ws.holidays.some((h) => h.date === dateStr)) return false;
     return true;
@@ -23,10 +38,22 @@ export const workSettingsService = {
 
   addHoliday(date: string, label: string) {
     const ws = useDataStore.getState().workSettings;
-    if (ws.holidays.some((h) => h.date === date)) return; // already exists
+    if (ws.holidays.some((h) => h.date === date)) return;
     useDataStore.getState().setWorkSettings({
       ...ws,
       holidays: [...ws.holidays, { date, label }].sort((a, b) => a.date.localeCompare(b.date)),
+    });
+    supabase
+      .from("holidays")
+      .insert({ date, label })
+      .then(({ error }) => {
+        if (error) warn("addHoliday", error);
+      });
+    logService.append({
+      userId: meId(),
+      action: "settings.holiday_add",
+      targetType: "holiday",
+      targetId: date,
     });
   },
 
@@ -36,14 +63,60 @@ export const workSettingsService = {
       ...ws,
       holidays: ws.holidays.filter((h) => h.date !== date),
     });
+    supabase
+      .from("holidays")
+      .delete()
+      .eq("date", date)
+      .then(({ error }) => {
+        if (error) warn("removeHoliday", error);
+      });
+    logService.append({
+      userId: meId(),
+      action: "settings.holiday_remove",
+      targetType: "holiday",
+      targetId: date,
+    });
   },
 
   setWorkingDays(days: number[]) {
     const ws = useDataStore.getState().workSettings;
     useDataStore.getState().setWorkSettings({ ...ws, workingDays: days });
+    supabase
+      .from("work_settings")
+      .upsert({ id: true, working_days: days })
+      .then(({ error }) => {
+        if (error) warn("setWorkingDays", error);
+      });
+    logService.append({
+      userId: meId(),
+      action: "settings.working_days_update",
+      targetType: "work_settings",
+      targetId: null,
+    });
   },
 
-  /** Count working days between two dates (inclusive). */
+  setAutoBackup(
+    patch: Partial<{ enabled: boolean; email: string; time: string; lastAutoBackupDate: string | null }>
+  ) {
+    const cur = useDataStore.getState().autoBackupSettings;
+    const next = { ...cur, ...patch };
+    useDataStore.getState().setAutoBackupSettings(next);
+
+    const dbPatch: Record<string, unknown> = { id: true };
+    if (patch.enabled !== undefined) dbPatch.auto_backup_enabled = patch.enabled;
+    if (patch.email !== undefined) dbPatch.auto_backup_email = patch.email;
+    if (patch.time !== undefined) dbPatch.auto_backup_time = patch.time;
+    if (patch.lastAutoBackupDate !== undefined)
+      dbPatch.last_auto_backup_date = patch.lastAutoBackupDate;
+
+    supabase
+      .from("work_settings")
+      .upsert(dbPatch)
+      .then(({ error }) => {
+        if (error) warn("setAutoBackup", error);
+      });
+  },
+
   countWorkingDays(from: Date, to: Date): number {
     let n = 0;
     const d = new Date(from);
@@ -56,5 +129,16 @@ export const workSettingsService = {
       d.setDate(d.getDate() + 1);
     }
     return n;
+  },
+
+  async refresh() {
+    const [ws, hol] = await Promise.all([
+      supabase.from("work_settings").select("*").eq("id", true).maybeSingle(),
+      supabase.from("holidays").select("*").order("date"),
+    ]);
+    const wsRow = (ws.data ?? null) as DbWorkSettingsRow | null;
+    const holRows = (hol.data ?? []) as DbHolidayRow[];
+    useDataStore.getState().setWorkSettings(mapWorkSettings(wsRow, holRows));
+    useDataStore.getState().setAutoBackupSettings(mapAutoBackupSettings(wsRow));
   },
 };

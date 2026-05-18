@@ -4,10 +4,12 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { cn } from "@/lib/utils";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
+import { useBootstrap } from "@/hooks/useBootstrap";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  useBootstrap();
   useAutoBackup();
 
   const handleToggle = useCallback(() => {
