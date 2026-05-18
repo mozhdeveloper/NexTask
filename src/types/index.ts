@@ -107,7 +107,9 @@ export interface Project {
   ownerId?: ID;
   status: "planning" | "in_progress" | "review" | "completed" | "on_hold";
   members?: ID[];
-  dueDate?: string;
+  startDate?: string;     // YYYY-MM-DD, optional
+  dueDate?: string;       // YYYY-MM-DD, optional
+  completedAt?: string;   // YYYY-MM-DD, set when status → completed
   progress?: number;
   createdAt: string;
 }

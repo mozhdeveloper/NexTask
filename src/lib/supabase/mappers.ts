@@ -139,7 +139,9 @@ export const mapProject = (r: DbProjectRow): Project => ({
   ownerId: r.owner_id ?? undefined,
   status: r.status,
   members: r.members ?? [],
+  startDate: r.start_date ?? undefined,
   dueDate: r.due_date ?? undefined,
+  completedAt: r.completed_at ?? undefined,
   progress: r.progress ?? undefined,
   createdAt: r.created_at,
 });

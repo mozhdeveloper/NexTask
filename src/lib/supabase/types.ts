@@ -125,7 +125,9 @@ export interface DbProjectRow {
   owner_id: string | null;
   status: DbProjectStatus;
   members: string[];
+  start_date: string | null;
   due_date: string | null;
+  completed_at: string | null;
   progress: number;
   created_at: string;
 }

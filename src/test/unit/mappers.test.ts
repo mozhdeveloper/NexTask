@@ -381,6 +381,8 @@ describe("mapWorkSettings", () => {
       status: "in_progress",
       members: ["u_emp1", "u_emp2"],
       due_date: "2026-06-01",
+      start_date: null,
+      completed_at: null,
       progress: 45,
       created_at: "2026-01-01T00:00:00Z",
     };

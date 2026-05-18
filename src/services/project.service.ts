@@ -37,7 +37,9 @@ export const projectService = {
       owner_id: p.ownerId ?? null,
       status: p.status,
       members: p.members ?? [],
+      start_date: p.startDate ?? null,
       due_date: p.dueDate ?? null,
+      completed_at: p.completedAt ?? null,
       progress: p.progress ?? 0,
       created_at: p.createdAt,
     });
@@ -73,7 +75,9 @@ export const projectService = {
     if (patch.ownerId !== undefined) dbPatch.owner_id = patch.ownerId;
     if (patch.status !== undefined) dbPatch.status = patch.status;
     if (patch.members !== undefined) dbPatch.members = patch.members;
-    if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate;
+    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate ?? null;
+    if (patch.dueDate !== undefined) dbPatch.due_date = patch.dueDate ?? null;
+    if (patch.completedAt !== undefined) dbPatch.completed_at = patch.completedAt ?? null;
     if (patch.progress !== undefined) dbPatch.progress = patch.progress;
 
     if (Object.keys(dbPatch).length === 0) return;

@@ -1,13 +1,14 @@
-"use client";
+﻿"use client";
 import { useMemo, useState } from "react";
-import { Plus, MoreVertical, Search, LayoutGrid, List, CalendarDays, Users } from "lucide-react";
+import {
+  Plus, MoreVertical, Search, LayoutGrid, List,
+  CalendarDays, Users, CalendarPlus, CalendarCheck,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useDataStore } from "@/store/dataStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -25,21 +26,29 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 
-const STATUS_VARIANTS: Record<Project["status"], "info" | "warning" | "success" | "muted" | "danger"> = {
-  planning: "info",
-  in_progress: "warning",
-  review: "info",
-  completed: "success",
-  on_hold: "muted",
+const STATUS_CONFIG: Record<
+  Project["status"],
+  { label: string; dot: string; bg: string; text: string; border: string; stripe: string }
+> = {
+  planning:    { label: "Planning",    dot: "bg-blue-500",    bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",  stripe: "bg-blue-500"    },
+  in_progress: { label: "In Progress", dot: "bg-amber-500",   bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200", stripe: "bg-amber-500"   },
+  review:      { label: "In Review",   dot: "bg-violet-500",  bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200",stripe: "bg-violet-500"  },
+  completed:   { label: "Completed",   dot: "bg-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",stripe: "bg-emerald-500" },
+  on_hold:     { label: "On Hold",     dot: "bg-slate-400",   bg: "bg-slate-50",   text: "text-slate-600",   border: "border-slate-200", stripe: "bg-slate-400"   },
 };
 
-const STATUS_LABEL: Record<Project["status"], string> = {
-  planning: "Planning",
-  in_progress: "In progress",
-  review: "Review",
-  completed: "Completed",
-  on_hold: "On hold",
-};
+function StatusBadge({ status }: { status: Project["status"] }) {
+  const sc = STATUS_CONFIG[status];
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+      sc.bg, sc.text, sc.border
+    )}>
+      <span className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", sc.dot)} />
+      {sc.label}
+    </span>
+  );
+}
 
 export default function ProjectsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
@@ -58,21 +67,27 @@ export default function ProjectsPage() {
   const filtered = useMemo(
     () =>
       projects
-        .filter((p) => (status === "all" ? true : p.status === status))
-        .filter((p) => (owner === "all" ? true : (p.ownerId ?? p.lead) === owner))
-        .filter((p) => (q ? (p.name + (p.description ?? "")).toLowerCase().includes(q.toLowerCase()) : true)),
+        .filter((p) => status === "all" || p.status === status)
+        .filter((p) => owner === "all" || (p.ownerId ?? p.lead) === owner)
+        .filter((p) => !q || (p.name + (p.description ?? "")).toLowerCase().includes(q.toLowerCase())),
     [projects, q, status, owner]
   );
 
   const stats = useMemo(() => {
-    const byStatus: Record<Project["status"], number> = {
-      planning: 0, in_progress: 0, review: 0, completed: 0, on_hold: 0,
-    };
+    const byStatus = {} as Record<Project["status"], number>;
+    (Object.keys(STATUS_CONFIG) as Project["status"][]).forEach((k) => (byStatus[k] = 0));
     projects.forEach((p) => byStatus[p.status]++);
     return byStatus;
   }, [projects]);
 
   if (!ready) return null;
+
+  const openEdit = (p: Project, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditing(p);
+    setDetails(null);
+    setOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -88,153 +103,201 @@ export default function ProjectsPage() {
         }
       />
 
-      {/* Stats bar */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-        {(Object.keys(STATUS_LABEL) as Project["status"][]).map((s) => (
-          <Card key={s}>
-            <CardContent className="flex items-center justify-between gap-2 p-3">
-              <div>
-                <div className="text-xs text-ink-muted">{STATUS_LABEL[s]}</div>
-                <div className="text-xl font-semibold">{stats[s]}</div>
+      {/* Status stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {(Object.keys(STATUS_CONFIG) as Project["status"][]).map((s) => {
+          const sc = STATUS_CONFIG[s];
+          return (
+            <button
+              key={s}
+              onClick={() => setStatus(status === s ? "all" : s)}
+              className={cn(
+                "group rounded-xl border p-3 text-left transition-all",
+                status === s
+                  ? cn("border-transparent shadow-sm", sc.bg, sc.border)
+                  : "border-surface-border bg-white hover:bg-surface-subtle"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className={cn("h-2 w-2 rounded-full flex-shrink-0", sc.dot)} />
+                <span className={cn(
+                  "ml-auto text-2xl font-bold tabular-nums",
+                  status === s ? sc.text : "text-ink"
+                )}>
+                  {stats[s]}
+                </span>
               </div>
-              <Badge variant={STATUS_VARIANTS[s]} className="capitalize">{s.replace("_", " ")}</Badge>
-            </CardContent>
-          </Card>
-        ))}
+              <div className={cn(
+                "mt-1 truncate text-xs font-medium",
+                status === s ? sc.text : "text-ink-muted"
+              )}>
+                {sc.label}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filters bar */}
-      <Card>
-        <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap p-3">
-          <div className="relative w-full flex-1 min-w-0 sm:min-w-60">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
-            <Input className="pl-9" placeholder="Search projects…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-            <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {(Object.keys(STATUS_LABEL) as Project["status"][]).map((s) => (
-                <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={owner} onValueChange={setOwner}>
-            <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Owner" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All owners</SelectItem>
-              {users.filter((u) => u.isActive).map((u) => (
-                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex gap-1 rounded-md border border-surface-border p-0.5">
-            <button
-              onClick={() => setView("grid")}
-              className={cn("flex items-center gap-1 rounded px-2 py-1 text-xs", view === "grid" ? "bg-primary text-white" : "text-ink-muted")}
-              aria-label="Grid view"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" /> Grid
-            </button>
-            <button
-              onClick={() => setView("list")}
-              className={cn("flex items-center gap-1 rounded px-2 py-1 text-xs", view === "list" ? "bg-primary text-white" : "text-ink-muted")}
-              aria-label="List view"
-            >
-              <List className="h-3.5 w-3.5" /> List
-            </button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filter toolbar */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <div className="relative flex-1 min-w-0 sm:min-w-56">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+          <Input className="pl-9" placeholder="Search projectsâ€¦" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {(Object.keys(STATUS_CONFIG) as Project["status"][]).map((s) => (
+              <SelectItem key={s} value={s}>{STATUS_CONFIG[s].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={owner} onValueChange={setOwner}>
+          <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="Owner" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All owners</SelectItem>
+            {users.filter((u) => u.isActive).map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex gap-1 self-start rounded-lg border border-surface-border p-0.5">
+          <button
+            onClick={() => setView("grid")}
+            className={cn("flex items-center gap-1 rounded px-2.5 py-1.5 text-xs font-medium transition-colors", view === "grid" ? "bg-ink text-white" : "text-ink-muted hover:text-ink")}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> Grid
+          </button>
+          <button
+            onClick={() => setView("list")}
+            className={cn("flex items-center gap-1 rounded px-2.5 py-1.5 text-xs font-medium transition-colors", view === "list" ? "bg-ink text-white" : "text-ink-muted hover:text-ink")}
+          >
+            <List className="h-3.5 w-3.5" /> List
+          </button>
+        </div>
+      </div>
 
       {filtered.length === 0 ? (
         <Card>
           <CardContent>
-            <EmptyState title="No projects" description="Adjust your filters or create a new project." />
+            <EmptyState
+              title="No projects found"
+              description={q || status !== "all" || owner !== "all" ? "Try clearing your filters." : "Create your first project to get started."}
+            />
           </CardContent>
         </Card>
       ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
+            const sc = STATUS_CONFIG[p.status];
             const ownerUser = users.find((u) => u.id === (p.ownerId ?? p.lead));
             const memberUsers = (p.members ?? []).map((id) => users.find((u) => u.id === id)).filter(Boolean) as typeof users;
-            const progress = p.progress ?? 0;
             const daysLeft = p.dueDate ? Math.ceil((new Date(p.dueDate).getTime() - Date.now()) / 86400000) : null;
             return (
-              <Card
+              <div
                 key={p.id}
-                className="flex h-full cursor-pointer flex-col transition hover:shadow-card"
+                className="group relative flex cursor-pointer flex-col rounded-xl border border-surface-border bg-white transition-all hover:shadow-md hover:-translate-y-0.5"
                 onClick={() => setDetails(p)}
               >
-                <div className={cn(
-                  "h-2 rounded-t-xl",
-                  p.status === "completed" ? "bg-emerald-500" :
-                  p.status === "in_progress" ? "bg-amber-500" :
-                  p.status === "on_hold" ? "bg-ink-soft" :
-                  "bg-primary"
-                )} />
-                <CardContent className="flex flex-1 flex-col gap-3">
+                {/* Status stripe */}
+                <div className={cn("h-1 w-full rounded-t-xl", sc.stripe)} />
+
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  {/* Header */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold truncate">{p.name}</div>
-                      <p className="mt-1 line-clamp-2 text-sm text-ink-muted">{p.description}</p>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold leading-snug truncate">{p.name}</h3>
+                      {p.description && (
+                        <p className="mt-1 line-clamp-2 text-sm text-ink-muted leading-relaxed">
+                          {p.description}
+                        </p>
+                      )}
                     </div>
                     {canManage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetails(p); }}>View details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(p); setOpen(true); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetails(p); }}>
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => openEdit(p, e)}>Edit</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}>Delete</DropdownMenuItem>
+                          <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}>
+                            Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={STATUS_VARIANTS[p.status]} className="capitalize">{STATUS_LABEL[p.status]}</Badge>
+
+                  {/* Status */}
+                  <StatusBadge status={p.status} />
+
+                  {/* Dates */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {p.startDate && (
+                      <span className="flex items-center gap-1 text-xs text-ink-muted">
+                        <CalendarPlus className="h-3 w-3" />
+                        {fmtDate(p.startDate, "MMM dd")}
+                      </span>
+                    )}
                     {p.dueDate && (
                       <span className={cn(
                         "flex items-center gap-1 text-xs",
-                        daysLeft !== null && daysLeft < 0 ? "text-rose-600" : daysLeft !== null && daysLeft < 7 ? "text-amber-600" : "text-ink-muted"
+                        daysLeft !== null && daysLeft < 0 ? "text-rose-600 font-medium" :
+                        daysLeft !== null && daysLeft < 7 ? "text-amber-600" : "text-ink-muted"
                       )}>
                         <CalendarDays className="h-3 w-3" />
                         {fmtDate(p.dueDate, "MMM dd")}
-                        {daysLeft !== null && daysLeft < 0 && ` · ${Math.abs(daysLeft)}d overdue`}
+                        {daysLeft !== null && daysLeft < 0 && ` Â· ${Math.abs(daysLeft)}d overdue`}
+                        {daysLeft !== null && daysLeft === 0 && " Â· Today"}
+                      </span>
+                    )}
+                    {p.completedAt && (
+                      <span className="flex items-center gap-1 text-xs text-emerald-600">
+                        <CalendarCheck className="h-3 w-3" />
+                        {fmtDate(p.completedAt, "MMM dd")}
                       </span>
                     )}
                   </div>
-                  <div>
-                    <div className="mb-1 flex justify-between text-xs text-ink-muted">
-                      <span>Progress</span><span>{progress}%</span>
-                    </div>
-                    <Progress value={progress} />
-                  </div>
-                  <div className="mt-auto flex items-center justify-between pt-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {ownerUser && <Avatar className="h-7 w-7"><AvatarFallback className={ownerUser.avatarColor}>{initials(ownerUser.name)}</AvatarFallback></Avatar>}
-                      <span className="text-sm truncate">{ownerUser?.name}</span>
+
+                  {/* Owner + members */}
+                  <div className="mt-auto flex items-center justify-between pt-1 border-t border-surface-border">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {ownerUser && (
+                        <Avatar className="h-6 w-6 flex-shrink-0">
+                          <AvatarFallback className={ownerUser.avatarColor}>{initials(ownerUser.name)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                      <span className="truncate text-xs text-ink-muted">{ownerUser?.name}</span>
                     </div>
                     {memberUsers.length > 0 && (
-                      <div className="flex items-center gap-1 text-xs text-ink-muted">
-                        <Users className="h-3 w-3" />
+                      <div className="flex items-center gap-1">
                         <div className="flex -space-x-1.5">
-                          {memberUsers.slice(0, 3).map((m) => (
+                          {memberUsers.slice(0, 4).map((m) => (
                             <Avatar key={m.id} className="h-5 w-5 text-[9px] ring-1 ring-white">
                               <AvatarFallback className={m.avatarColor}>{initials(m.name)}</AvatarFallback>
                             </Avatar>
                           ))}
                         </div>
-                        {memberUsers.length > 3 && <span>+{memberUsers.length - 3}</span>}
+                        {memberUsers.length > 4 && (
+                          <span className="text-[10px] text-ink-muted">+{memberUsers.length - 4}</span>
+                        )}
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -245,17 +308,23 @@ export default function ProjectsPage() {
               <THead>
                 <TR>
                   <TH>Project</TH>
-                  <TH className="hidden sm:table-cell">Owner</TH>
                   <TH>Status</TH>
+                  <TH className="hidden sm:table-cell">Owner</TH>
+                  <TH className="hidden md:table-cell">Start</TH>
                   <TH className="hidden md:table-cell">Due</TH>
-                  <TH className="w-32">Progress</TH>
+                  <TH className="hidden lg:table-cell">Completed</TH>
+                  <TH className="hidden sm:table-cell">
+                    <Users className="h-3.5 w-3.5" />
+                  </TH>
                   {canManage && <TH />}
                 </TR>
               </THead>
               <TBody>
                 {filtered.map((p) => {
                   const ownerUser = users.find((u) => u.id === (p.ownerId ?? p.lead));
-                  const progress = p.progress ?? 0;
+                  const memberUsers = (p.members ?? []).map((id) => users.find((u) => u.id === id)).filter(Boolean) as typeof users;
+                  const daysLeft = p.dueDate ? Math.ceil((new Date(p.dueDate).getTime() - Date.now()) / 86400000) : null;
+                  const sc = STATUS_CONFIG[p.status];
                   return (
                     <TR
                       key={p.id}
@@ -263,22 +332,70 @@ export default function ProjectsPage() {
                       onClick={() => setDetails(p)}
                     >
                       <TD>
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-xs text-ink-muted line-clamp-1">{p.description}</div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("h-full w-0.5 self-stretch rounded-full", sc.stripe)} />
+                          <div>
+                            <div className="font-medium">{p.name}</div>
+                            {p.description && (
+                              <div className="text-xs text-ink-muted line-clamp-1 max-w-xs">{p.description}</div>
+                            )}
+                          </div>
+                        </div>
+                      </TD>
+                      <TD><StatusBadge status={p.status} /></TD>
+                      <TD className="hidden sm:table-cell">
+                        {ownerUser && (
+                          <div className="flex items-center gap-1.5">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className={ownerUser.avatarColor}>{initials(ownerUser.name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{ownerUser.name}</span>
+                          </div>
+                        )}
+                      </TD>
+                      <TD className="hidden md:table-cell text-sm text-ink-muted">
+                        {p.startDate ? (
+                          <span className="flex items-center gap-1">
+                            <CalendarPlus className="h-3.5 w-3.5" />
+                            {fmtDate(p.startDate, "MMM dd, yyyy")}
+                          </span>
+                        ) : "â€”"}
+                      </TD>
+                      <TD className="hidden md:table-cell">
+                        {p.dueDate ? (
+                          <span className={cn(
+                            "flex items-center gap-1 text-sm",
+                            daysLeft !== null && daysLeft < 0 ? "text-rose-600" :
+                            daysLeft !== null && daysLeft < 7 ? "text-amber-600" : "text-ink-muted"
+                          )}>
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            {fmtDate(p.dueDate, "MMM dd, yyyy")}
+                          </span>
+                        ) : "â€”"}
+                      </TD>
+                      <TD className="hidden lg:table-cell text-sm text-ink-muted">
+                        {p.completedAt ? (
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <CalendarCheck className="h-3.5 w-3.5" />
+                            {fmtDate(p.completedAt, "MMM dd, yyyy")}
+                          </span>
+                        ) : "â€”"}
                       </TD>
                       <TD className="hidden sm:table-cell">
-                        <div className="flex items-center gap-2">
-                          {ownerUser && <Avatar className="h-6 w-6"><AvatarFallback className={ownerUser.avatarColor}>{initials(ownerUser.name)}</AvatarFallback></Avatar>}
-                          <span className="text-sm">{ownerUser?.name}</span>
-                        </div>
-                      </TD>
-                      <TD><Badge variant={STATUS_VARIANTS[p.status]} className="capitalize">{STATUS_LABEL[p.status]}</Badge></TD>
-                      <TD className="hidden md:table-cell text-sm text-ink-muted">{p.dueDate ? fmtDate(p.dueDate, "MMM dd") : "—"}</TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          <Progress value={progress} className="flex-1" />
-                          <span className="text-xs tabular-nums text-ink-muted">{progress}%</span>
-                        </div>
+                        {memberUsers.length > 0 && (
+                          <div className="flex -space-x-1.5">
+                            {memberUsers.slice(0, 3).map((m) => (
+                              <Avatar key={m.id} className="h-6 w-6 text-[10px] ring-1 ring-white">
+                                <AvatarFallback className={m.avatarColor}>{initials(m.name)}</AvatarFallback>
+                              </Avatar>
+                            ))}
+                            {memberUsers.length > 3 && (
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-subtle ring-1 ring-white text-[10px] text-ink-muted">
+                                +{memberUsers.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </TD>
                       {canManage && (
                         <TD>
@@ -289,9 +406,11 @@ export default function ProjectsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(p); setOpen(true); }}>Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => openEdit(p, e)}>Edit</DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}>Delete</DropdownMenuItem>
+                              <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirmDelete(p); }}>
+                                Delete
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TD>
@@ -310,7 +429,7 @@ export default function ProjectsPage() {
         open={!!details}
         onOpenChange={(v) => !v && setDetails(null)}
         project={details}
-        onEdit={canManage ? () => { if (details) { setEditing(details); setDetails(null); setOpen(true); } } : undefined}
+        onEdit={canManage ? () => { if (details) openEdit(details); } : undefined}
       />
       <ConfirmModal
         open={!!confirmDelete}
@@ -326,6 +445,8 @@ export default function ProjectsPage() {
             toast.success("Project deleted.");
           } catch (e) {
             toast.error((e as Error).message);
+          } finally {
+            setConfirmDelete(null);
           }
         }}
       />
