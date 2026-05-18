@@ -44,15 +44,15 @@ function StatCard({
   icon: Icon, label, value, sub, cls,
 }: { icon: LucideIcon; label: string; value: number; sub?: string; cls?: string }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-surface-border bg-white px-5 py-4 shadow-card transition-shadow hover:shadow-pop">
+    <div className="relative overflow-hidden rounded-xl border border-surface-border bg-white px-3 py-3 shadow-card transition-shadow hover:shadow-pop sm:px-5 sm:py-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-soft">{label}</p>
-          <p className="mt-1.5 text-3xl font-extrabold leading-none tabular-nums text-ink">{value}</p>
-          {sub && <p className="mt-1 truncate text-xs text-ink-muted">{sub}</p>}
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-soft sm:text-[11px]">{label}</p>
+          <p className="mt-1 text-2xl font-extrabold leading-none tabular-nums text-ink sm:mt-1.5 sm:text-3xl">{value}</p>
+          {sub && <p className="mt-1 truncate text-[11px] text-ink-muted sm:text-xs">{sub}</p>}
         </div>
-        <span className={cn("flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl", cls)}>
-          <Icon className="h-5 w-5" />
+        <span className={cn("flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl", cls)}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </span>
       </div>
     </div>
@@ -238,8 +238,8 @@ export default function EmployeesPage() {
                   <TH>Role</TH>
                   <TH className="hidden md:table-cell">Department</TH>
                   <TH className="hidden lg:table-cell">Joined</TH>
-                  <TH>Status</TH>
-                  <TH className="w-12" />
+                  <TH className="hidden sm:table-cell">Status</TH>
+                  <TH className="w-10" />
                 </TR>
               </THead>
               <TBody>
@@ -310,7 +310,7 @@ export default function EmployeesPage() {
                       </TD>
 
                       {/* Status */}
-                      <TD>
+                      <TD className="hidden sm:table-cell">
                         {u.isActive ? (
                           <Badge variant="success">Active</Badge>
                         ) : (
@@ -325,7 +325,7 @@ export default function EmployeesPage() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="opacity-0 transition-opacity group-hover:opacity-100"
+                              className="transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                             >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
