@@ -54,11 +54,11 @@ export function ProjectFormModal({
         },
   });
 
-  const submit = (v: V) => {
+  const submit = async (v: V) => {
     setBusy(true);
     try {
-      if (editing) projectService.update(editing.id, v);
-      else projectService.create(v);
+      if (editing) await projectService.update(editing.id, v);
+      else await projectService.create(v);
       toast.success(editing ? "Project updated." : "Project created.");
       reset();
       onOpenChange(false);

@@ -17,14 +17,14 @@ export function RevisionRequestModal({
 }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const submit = () => {
+  const submit = async () => {
     if (reason.trim().length < 5) {
       toast.error("Please give a brief reason (≥ 5 chars).");
       return;
     }
     setBusy(true);
     try {
-      revisionService.request(submissionId, reason);
+      await revisionService.request(submissionId, reason);
       toast.success("Revision requested.");
       setReason("");
       onOpenChange(false);

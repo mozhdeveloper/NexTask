@@ -40,14 +40,14 @@ export function EmployeeFormModal({
       : { name: "", email: "", jobTitle: "", role: "employee", departmentId: departments[0]?.id ?? "" },
   });
 
-  const submit = (v: V) => {
+  const submit = async (v: V) => {
     setBusy(true);
     try {
       if (editing) {
-        userService.update(editing.id, v);
+        await userService.update(editing.id, v);
         toast.success("Employee updated.");
       } else {
-        userService.create(v);
+        await userService.create(v);
         toast.success("Employee added.");
       }
       reset();

@@ -30,7 +30,7 @@ export function SubmitWorkForm({
 }) {
   const user = useAuth();
   const submissionTypes = useDataStore((s) => s.submissionTypes);
-  const dailyType = submissionTypes.find((t) => t.id === "st_daily")!;
+  const dailyType = submissionTypes.find((t) => t.id === "st_daily");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -56,6 +56,10 @@ export function SubmitWorkForm({
   const locked = !!existing?.locked;
 
   const onSubmit = async (v: FormValues) => {
+    if (!dailyType) {
+      toast.error("Submission type not loaded. Please refresh the page.");
+      return;
+    }
     setBusy(true);
     try {
       await submissionService.create({

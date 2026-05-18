@@ -19,17 +19,18 @@ export function RevisionDecisionModal({
 }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const submit = () => {
+  const submit = async () => {
     setBusy(true);
     try {
-      if (mode === "approve") revisionService.approve(revisionId, note || undefined);
-      else {
+      if (mode === "approve") {
+        await revisionService.approve(revisionId, note || undefined);
+      } else {
         if (note.trim().length < 3) {
           toast.error("Please add a short rejection note.");
           setBusy(false);
           return;
         }
-        revisionService.reject(revisionId, note);
+        await revisionService.reject(revisionId, note);
       }
       toast.success(mode === "approve" ? "Revision approved." : "Revision rejected.");
       setNote("");
