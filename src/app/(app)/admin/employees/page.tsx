@@ -1,16 +1,22 @@
 ﻿"use client";
 import { useMemo, useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, MoreVertical, Users, UserCheck, UserX, Shield, Briefcase } from "lucide-react";
+import {
+  Search, Plus, MoreVertical, Users, UserCheck, UserX,
+  ShieldCheck, Eye, Pencil, Power, X,
+} from "lucide-react";
 import { useDataStore } from "@/store/dataStore";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown";
 import { EmployeeFormModal } from "@/components/modals/EmployeeFormModal";
 import { EmployeeDetailsModal } from "@/components/modals/EmployeeDetailsModal";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
@@ -22,28 +28,32 @@ import { useRequireRole } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
+import { fmtDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
 const PAGE_SIZE = 15;
 
-const ROLE_BADGE: Record<string, string> = {
-  admin: "bg-indigo-50 text-indigo-700 border border-indigo-200",
-  manager: "bg-primary-soft text-primary border border-primary/30",
-  employee: "bg-surface-subtle text-ink-muted border border-surface-border",
+const ROLE_CLS: Record<string, string> = {
+  admin: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  manager: "border-primary/20 bg-primary-soft text-primary",
+  employee: "border-surface-border bg-surface-subtle text-ink-muted",
 };
 
 function StatCard({
-  icon: Icon, label, value, iconClass,
-}: { icon: LucideIcon; label: string; value: number; iconClass?: string }) {
+  icon: Icon, label, value, sub, cls,
+}: { icon: LucideIcon; label: string; value: number; sub?: string; cls?: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-white px-4 py-4 shadow-card">
-      <span className={cn("flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg", iconClass)}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <div>
-        <p className="text-2xl font-bold leading-none text-ink">{value}</p>
-        <p className="mt-0.5 text-xs text-ink-muted">{label}</p>
+    <div className="relative overflow-hidden rounded-xl border border-surface-border bg-white px-5 py-4 shadow-card transition-shadow hover:shadow-pop">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-soft">{label}</p>
+          <p className="mt-1.5 text-3xl font-extrabold leading-none tabular-nums text-ink">{value}</p>
+          {sub && <p className="mt-1 truncate text-xs text-ink-muted">{sub}</p>}
+        </div>
+        <span className={cn("flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl", cls)}>
+          <Icon className="h-5 w-5" />
+        </span>
       </div>
     </div>
   );
@@ -70,18 +80,25 @@ export default function EmployeesPage() {
     [users],
   );
 
-  const rows = useMemo(() =>
-    users
-      .filter((u) => (dept === "all" ? true : u.departmentId === dept))
-      .filter((u) => (role === "all" ? true : u.role === role))
-      .filter((u) => (q ? (u.name + u.email).toLowerCase().includes(q.toLowerCase()) : true)),
-    [users, q, dept, role]);
+  const rows = useMemo(
+    () =>
+      users
+        .filter((u) => (dept === "all" ? true : u.departmentId === dept))
+        .filter((u) => (role === "all" ? true : u.role === role))
+        .filter((u) =>
+          q ? (u.name + " " + u.email).toLowerCase().includes(q.toLowerCase()) : true,
+        ),
+    [users, q, dept, role],
+  );
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const isFiltered = q !== "" || dept !== "all" || role !== "all";
 
   useEffect(() => { setPage(1); }, [q, dept, role]);
+
+  const clearFilters = () => { setQ(""); setDept("all"); setRole("all"); };
 
   if (!ready) return null;
 
@@ -89,48 +106,100 @@ export default function EmployeesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Employees"
-        description="Manage members of your office workspace."
+        description="Manage your team members, roles, and workspace access."
         actions={
-          canManage
-            ? (
-              <Button onClick={() => { setEditing(null); setOpen(true); }}>
-                <Plus className="h-4 w-4" /> Add employee
-              </Button>
-            )
-            : undefined
+          canManage ? (
+            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus className="h-4 w-4" /> Add employee
+            </Button>
+          ) : undefined
         }
       />
 
-      {/* Stat cards */}
+      {/* ── Stat cards ── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard icon={Users} label="Total employees" value={users.length} iconClass="bg-primary-soft text-primary" />
-        <StatCard icon={UserCheck} label="Active" value={activeCount} iconClass="bg-success-soft text-success" />
-        <StatCard icon={UserX} label="Inactive" value={inactiveCount} iconClass="bg-surface-subtle text-ink-muted" />
-        <StatCard icon={Shield} label="Admins & Managers" value={privilegedCount} iconClass="bg-indigo-50 text-indigo-600" />
+        <StatCard
+          icon={Users}
+          label="Total"
+          value={users.length}
+          sub={`${users.length} member${users.length !== 1 ? "s" : ""}`}
+          cls="bg-primary-soft text-primary"
+        />
+        <StatCard
+          icon={UserCheck}
+          label="Active"
+          value={activeCount}
+          sub={`${Math.round((activeCount / Math.max(users.length, 1)) * 100)}% of team`}
+          cls="bg-success-soft text-success"
+        />
+        <StatCard
+          icon={UserX}
+          label="Inactive"
+          value={inactiveCount}
+          sub={inactiveCount === 0 ? "All members active" : `${inactiveCount} deactivated`}
+          cls="bg-surface-subtle text-ink-muted"
+        />
+        <StatCard
+          icon={ShieldCheck}
+          label="Privileged"
+          value={privilegedCount}
+          sub="Admins & Managers"
+          cls="bg-indigo-50 text-indigo-600"
+        />
       </div>
 
+      {/* ── Main card ── */}
       <Card>
-        <CardContent className="space-y-4">
+        <CardHeader className="pb-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                {isFiltered
+                  ? `${rows.length} of ${users.length} employees match your filters`
+                  : `${users.length} employee${users.length !== 1 ? "s" : ""} in this workspace`}
+              </CardDescription>
+            </div>
+            {isFiltered && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs text-ink-muted hover:text-ink"
+                onClick={clearFilters}
+              >
+                <X className="h-3.5 w-3.5" /> Clear filters
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-0 pt-4">
           {/* Filters */}
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <div className="relative min-w-0 flex-1 sm:min-w-56">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
               <Input
                 className="pl-9"
-                placeholder="Search by name or emailâ€¦"
+                placeholder="Search by name or email..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
             </div>
             <Select value={dept} onValueChange={setDept}>
-              <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="All departments" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All departments</SelectItem>
-                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={role} onValueChange={setRole}>
-              <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue placeholder="All roles" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
@@ -140,12 +209,26 @@ export default function EmployeesPage() {
             </Select>
           </div>
 
-          {/* Table or empty */}
+          {/* Divider */}
+          <div className="-mx-5 mt-4 border-t border-surface-border" />
+
+          {/* Content */}
           {pageRows.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No employees found"
-              description="Try adjusting your search, department, or role filter."
+              title={isFiltered ? "No employees match your filters" : "No employees yet"}
+              description={
+                isFiltered
+                  ? "Try adjusting your search, department, or role filter."
+                  : "Add your first team member to get started."
+              }
+              action={
+                !isFiltered && canManage ? (
+                  <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }}>
+                    <Plus className="h-4 w-4" /> Add employee
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <Table>
@@ -153,9 +236,10 @@ export default function EmployeesPage() {
                 <TR>
                   <TH>Employee</TH>
                   <TH>Role</TH>
-                  <TH>Department</TH>
+                  <TH className="hidden md:table-cell">Department</TH>
+                  <TH className="hidden lg:table-cell">Joined</TH>
                   <TH>Status</TH>
-                  <TH />
+                  <TH className="w-12" />
                 </TR>
               </THead>
               <TBody>
@@ -164,65 +248,108 @@ export default function EmployeesPage() {
                   return (
                     <TR
                       key={u.id}
-                      className="cursor-pointer hover:bg-surface-subtle"
+                      className="group cursor-pointer"
                       onClick={() => setDetails(u)}
                     >
+                      {/* Employee cell */}
                       <TD>
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9 flex-shrink-0">
-                            <AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback>
-                          </Avatar>
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback
+                                className={cn(
+                                  "text-xs font-semibold text-white",
+                                  u.avatarColor || "bg-ink-soft",
+                                )}
+                              >
+                                {initials(u.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span
+                              className={cn(
+                                "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white",
+                                u.isActive ? "bg-success" : "bg-ink-soft",
+                              )}
+                            />
+                          </div>
                           <div className="min-w-0">
-                            <div className="truncate font-medium text-ink">{u.name}</div>
-                            <div className="truncate text-xs text-ink-muted">{u.email}</div>
+                            <div className="truncate text-sm font-semibold text-ink">{u.name}</div>
+                            <div className="truncate text-xs text-ink-muted">
+                              {u.jobTitle ?? u.email}
+                            </div>
                           </div>
                         </div>
                       </TD>
+
+                      {/* Role */}
                       <TD>
-                        <span className={cn(
-                          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
-                          ROLE_BADGE[u.role] ?? ROLE_BADGE.employee,
-                        )}>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize",
+                            ROLE_CLS[u.role] ?? ROLE_CLS.employee,
+                          )}
+                        >
                           {u.role}
                         </span>
                       </TD>
-                      <TD>
+
+                      {/* Department */}
+                      <TD className="hidden md:table-cell">
                         {d ? (
-                          <span className="inline-flex items-center gap-1.5 text-sm text-ink">
-                            <Briefcase className="h-3.5 w-3.5 text-ink-soft" />
-                            {d.name}
-                          </span>
+                          <span className="text-sm text-ink">{d.name}</span>
                         ) : (
-                          <span className="text-xs text-ink-soft">â€”</span>
+                          <span className="text-xs text-ink-soft">—</span>
                         )}
                       </TD>
-                      <TD>
-                        {u.isActive
-                          ? <Badge variant="success">Active</Badge>
-                          : <Badge variant="muted">Inactive</Badge>}
+
+                      {/* Joined */}
+                      <TD className="hidden lg:table-cell">
+                        <span className="text-xs text-ink-muted">
+                          {fmtDate(u.createdAt, "MMM d, yyyy")}
+                        </span>
                       </TD>
+
+                      {/* Status */}
                       <TD>
+                        {u.isActive ? (
+                          <Badge variant="success">Active</Badge>
+                        ) : (
+                          <Badge variant="muted">Inactive</Badge>
+                        )}
+                      </TD>
+
+                      {/* Actions */}
+                      <TD onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="opacity-0 transition-opacity group-hover:opacity-100"
+                            >
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetails(u); }}>
-                              View details
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setDetails(u)}
+                            >
+                              <Eye className="h-4 w-4" /> View profile
                             </DropdownMenuItem>
                             {canManage && (
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(u); setOpen(true); }}>
-                                Edit
+                              <DropdownMenuItem
+                                onClick={() => { setEditing(u); setOpen(true); }}
+                              >
+                                <Pencil className="h-4 w-4" /> Edit
                               </DropdownMenuItem>
                             )}
                             {canManage && <DropdownMenuSeparator />}
                             {canManage && (
                               <DropdownMenuItem
                                 danger
-                                onClick={(e) => { e.stopPropagation(); setConfirm(u); }}
+                                onClick={() => setConfirm(u)}
                               >
+                                <Power className="h-4 w-4" />
                                 {u.isActive ? "Deactivate" : "Reactivate"}
                               </DropdownMenuItem>
                             )}
@@ -236,13 +363,17 @@ export default function EmployeesPage() {
             </Table>
           )}
 
-          <Pagination
-            page={safePage}
-            totalPages={totalPages}
-            totalItems={rows.length}
-            pageSize={PAGE_SIZE}
-            onPageChange={(p) => setPage(p)}
-          />
+          {rows.length > PAGE_SIZE && (
+            <div className="mt-4">
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={rows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={(p) => setPage(p)}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -251,21 +382,35 @@ export default function EmployeesPage() {
         open={!!details}
         onOpenChange={(v) => !v && setDetails(null)}
         user={details}
-        onEdit={canManage ? () => { if (details) { setEditing(details); setDetails(null); setOpen(true); } } : undefined}
+        onEdit={
+          canManage
+            ? () => {
+                if (details) {
+                  setEditing(details);
+                  setDetails(null);
+                  setOpen(true);
+                }
+              }
+            : undefined
+        }
       />
       <ConfirmModal
         open={!!confirm}
         onOpenChange={(v) => !v && setConfirm(null)}
         title={confirm?.isActive ? "Deactivate employee?" : "Reactivate employee?"}
-        description={confirm?.isActive
-          ? "They will lose access until you reactivate them."
-          : "They will regain access to the workspace."}
+        description={
+          confirm?.isActive
+            ? `${confirm?.name ?? "This employee"} will lose access until you reactivate them.`
+            : `${confirm?.name ?? "This employee"} will regain access to the workspace.`
+        }
         confirmLabel={confirm?.isActive ? "Deactivate" : "Reactivate"}
         destructive={confirm?.isActive}
         onConfirm={() => {
           if (!confirm) return;
           userService.toggleActive(confirm.id);
-          toast.success(confirm.isActive ? "Employee deactivated." : "Employee reactivated.");
+          toast.success(
+            confirm.isActive ? `${confirm.name} deactivated.` : `${confirm.name} reactivated.`,
+          );
         }}
       />
     </div>
