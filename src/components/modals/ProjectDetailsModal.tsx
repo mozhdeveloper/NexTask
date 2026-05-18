@@ -1,6 +1,7 @@
 ﻿"use client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useDataStore } from "@/store/dataStore";
 import { initials } from "@/lib/status";
@@ -20,21 +21,13 @@ import type { Project } from "@/types";
 
 const STATUS_CONFIG: Record<
   Project["status"],
-  { label: string; dot: string; bg: string; text: string; border: string }
+  { label: string; dot: string; bg: string; text: string; border: string; stripe: string; badgeVariant: string }
 > = {
-  planning:    { label: "Planning",    dot: "bg-blue-500",    bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200" },
-  in_progress: { label: "In Progress", dot: "bg-amber-500",   bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200" },
-  review:      { label: "In Review",   dot: "bg-violet-500",  bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200" },
-  completed:   { label: "Completed",   dot: "bg-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  on_hold:     { label: "On Hold",     dot: "bg-slate-400",   bg: "bg-slate-50",   text: "text-slate-600",   border: "border-slate-200" },
-};
-
-const STRIPE_COLOR: Record<Project["status"], string> = {
-  planning:    "bg-blue-500",
-  in_progress: "bg-amber-500",
-  review:      "bg-violet-500",
-  completed:   "bg-emerald-500",
-  on_hold:     "bg-slate-400",
+  planning:    { label: "Planning",    dot: "bg-blue-500",    bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200",   stripe: "bg-blue-500",    badgeVariant: "info"    },
+  in_progress: { label: "In Progress", dot: "bg-amber-500",   bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200",  stripe: "bg-amber-500",   badgeVariant: "warning" },
+  review:      { label: "In Review",   dot: "bg-violet-500",  bg: "bg-violet-50",  text: "text-violet-700",  border: "border-violet-200", stripe: "bg-violet-500",  badgeVariant: "info"    },
+  completed:   { label: "Completed",   dot: "bg-emerald-500", bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200",stripe: "bg-emerald-500", badgeVariant: "success" },
+  on_hold:     { label: "On Hold",     dot: "bg-slate-400",   bg: "bg-slate-50",   text: "text-slate-600",   border: "border-slate-200",  stripe: "bg-slate-400",   badgeVariant: "muted"   },
 };
 
 export function ProjectDetailsModal({
@@ -63,173 +56,173 @@ export function ProjectDetailsModal({
     ? Math.ceil((new Date(project.dueDate).getTime() - Date.now()) / 86400000)
     : null;
 
-  const dueDateUrgency =
+  const dueDateColor =
     daysLeft !== null
       ? daysLeft < 0
         ? "text-rose-600"
         : daysLeft < 7
         ? "text-amber-600"
-        : "text-ink-muted"
-      : "text-ink-muted";
+        : "text-foreground"
+      : "text-foreground";
+
+  function InfoCard({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+    return (
+      <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+        <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border bg-background">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+          <div className="mt-0.5">{children}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-full p-0 sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Status accent stripe */}
-        <div className={cn("h-1.5 w-full rounded-t-lg flex-shrink-0", STRIPE_COLOR[project.status])} />
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        {/* Status colour stripe */}
+        <div className={cn("h-1 w-full flex-shrink-0 rounded-t-lg", sc.stripe)} />
 
-        <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4 space-y-5">
+        <div className="flex-1 overflow-y-auto">
           {/* Header */}
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="text-xl leading-snug">{project.name}</DialogTitle>
-                {project.description && (
-                  <p className="mt-1.5 text-sm text-ink-muted leading-relaxed">{project.description}</p>
-                )}
-              </div>
-              {onEdit && (
-                <Button size="sm" variant="outline" onClick={onEdit} className="flex-shrink-0">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
+          <div className="flex items-start justify-between gap-3 px-6 pt-5">
+            <DialogHeader className="flex-1 space-y-1">
+              <DialogTitle className="text-xl font-semibold leading-snug">{project.name}</DialogTitle>
+              {project.description && (
+                <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
               )}
-            </div>
-          </DialogHeader>
+            </DialogHeader>
+            {onEdit && (
+              <Button size="sm" variant="outline" onClick={onEdit} className="flex-shrink-0 gap-1.5">
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
+            )}
+          </div>
 
-          {/* Status badge â€” prominent */}
-          <div className="flex items-center gap-2">
+          {/* Status + department */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 px-6">
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium",
                 sc.bg, sc.text, sc.border
               )}
             >
-              <span className={cn("h-2 w-2 rounded-full", sc.dot)} />
+              <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", sc.dot)} />
               {sc.label}
             </span>
             {dept && (
-              <span className="flex items-center gap-1 text-xs text-ink-muted">
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Building2 className="h-3.5 w-3.5" />
                 {dept.name}
               </span>
             )}
           </div>
 
+          <div className="mt-4 border-t" />
+
           {/* Info grid */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {/* Owner */}
-            <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-subtle p-3">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-surface-border">
-                <Flag className="h-4 w-4 text-ink-soft" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wide text-ink-muted">Owner</p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  {owner && (
-                    <Avatar className="h-5 w-5 text-[9px]">
-                      <AvatarFallback className={owner.avatarColor}>{initials(owner.name)}</AvatarFallback>
-                    </Avatar>
-                  )}
-                  <span className="text-sm font-medium truncate">{owner?.name ?? "â€”"}</span>
+          <div className="grid grid-cols-1 gap-3 p-6 sm:grid-cols-2">
+            <InfoCard icon={<Flag className="h-3.5 w-3.5 text-muted-foreground" />} label="Owner">
+              {owner ? (
+                <div className="flex items-center gap-1.5">
+                  <Avatar className="h-5 w-5 text-[9px]">
+                    <AvatarFallback className={owner.avatarColor}>{initials(owner.name)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">{owner.name}</span>
                 </div>
-              </div>
-            </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Not assigned</span>
+              )}
+            </InfoCard>
 
-            {/* Start date */}
-            <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-subtle p-3">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-surface-border">
-                <CalendarPlus className="h-4 w-4 text-ink-soft" />
+            <InfoCard icon={<CalendarPlus className="h-3.5 w-3.5 text-muted-foreground" />} label="Start Date">
+              <span className="text-sm font-medium">
+                {project.startDate ? fmtDate(project.startDate, "MMM dd, yyyy") : (
+                  <span className="text-muted-foreground">Not set</span>
+                )}
               </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-ink-muted">Start date</p>
-                <p className="mt-0.5 text-sm font-medium">
-                  {project.startDate ? fmtDate(project.startDate, "MMM dd, yyyy") : "â€”"}
-                </p>
-              </div>
-            </div>
+            </InfoCard>
 
-            {/* Due date */}
-            <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-subtle p-3">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-surface-border">
-                <CalendarDays className="h-4 w-4 text-ink-soft" />
-              </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-ink-muted">Due date</p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className={cn("text-sm font-medium", dueDateUrgency)}>
-                    {project.dueDate ? fmtDate(project.dueDate, "MMM dd, yyyy") : "â€”"}
+            <InfoCard icon={<CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />} label="Due Date">
+              {project.dueDate ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={cn("text-sm font-medium", dueDateColor)}>
+                    {fmtDate(project.dueDate, "MMM dd, yyyy")}
                   </span>
-                  {daysLeft !== null && project.dueDate && (
-                    <span className={cn("text-xs", dueDateUrgency)}>
+                  {daysLeft !== null && (
+                    <Badge
+                      variant={daysLeft < 0 ? "danger" : daysLeft < 7 ? "warning" : "muted"}
+                      className="text-[10px] px-1.5 py-0"
+                    >
                       {daysLeft < 0
-                        ? `Â· ${Math.abs(daysLeft)}d overdue`
+                        ? `${Math.abs(daysLeft)}d overdue`
                         : daysLeft === 0
-                        ? "Â· Due today"
-                        : `Â· ${daysLeft}d left`}
-                    </span>
+                        ? "Due today"
+                        : `${daysLeft}d left`}
+                    </Badge>
                   )}
                 </div>
-              </div>
-            </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Not set</span>
+              )}
+            </InfoCard>
 
-            {/* Completion date */}
-            <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-subtle p-3">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-surface-border">
-                <CalendarCheck className="h-4 w-4 text-ink-soft" />
+            <InfoCard icon={<CalendarCheck className="h-3.5 w-3.5 text-muted-foreground" />} label="Completed">
+              <span className="text-sm font-medium">
+                {project.completedAt ? (
+                  <span className="text-emerald-600">{fmtDate(project.completedAt, "MMM dd, yyyy")}</span>
+                ) : (
+                  <span className="text-muted-foreground">Not set</span>
+                )}
               </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-ink-muted">Completed</p>
-                <p className="mt-0.5 text-sm font-medium">
-                  {project.completedAt ? fmtDate(project.completedAt, "MMM dd, yyyy") : "â€”"}
-                </p>
-              </div>
-            </div>
+            </InfoCard>
 
-            {/* Created */}
-            <div className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-subtle p-3 sm:col-span-2">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white border border-surface-border">
-                <Clock className="h-4 w-4 text-ink-soft" />
+            <InfoCard icon={<Clock className="h-3.5 w-3.5 text-muted-foreground" />} label="Created">
+              <span className="text-sm font-medium">
+                {fmtDate(project.createdAt, "MMM dd, yyyy")}
               </span>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-ink-muted">Created</p>
-                <p className="mt-0.5 text-sm font-medium">
-                  {fmtDate(project.createdAt, "MMM dd, yyyy")}
-                </p>
-              </div>
-            </div>
+            </InfoCard>
           </div>
 
-          {/* Team */}
-          <div className="space-y-2">
-            <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-ink-muted">
-              <Users className="h-3.5 w-3.5" />
-              Team Â· {members.length} member{members.length !== 1 ? "s" : ""}
-            </p>
+          {/* Team members */}
+          <div className="px-6 pb-6">
+            <div className="mb-3 flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Team ({members.length} {members.length === 1 ? "member" : "members"})
+              </span>
+            </div>
             {members.length === 0 ? (
-              <p className="text-sm text-ink-muted">No team members assigned.</p>
+              <p className="text-sm text-muted-foreground">No team members assigned.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {members.map((m) => (
                   <div
                     key={m.id}
-                    className="flex items-center gap-1.5 rounded-full border border-surface-border bg-white px-2.5 py-1"
+                    className="flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 shadow-sm"
                   >
                     <Avatar className="h-5 w-5 text-[9px]">
                       <AvatarFallback className={m.avatarColor}>{initials(m.name)}</AvatarFallback>
                     </Avatar>
                     <span className="text-xs font-medium">{m.name}</span>
                     {m.jobTitle && (
-                      <span className="text-[10px] text-ink-muted">{m.jobTitle}</span>
+                      <span className="text-[10px] text-muted-foreground">{m.jobTitle}</span>
                     )}
                   </div>
                 ))}
               </div>
             )}
           </div>
+        </div>
 
-          <div className="flex justify-end border-t border-surface-border pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          </div>
+        {/* Footer */}
+        <div className="flex flex-shrink-0 items-center justify-end border-t bg-muted/20 px-6 py-3">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

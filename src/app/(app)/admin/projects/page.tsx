@@ -259,8 +259,8 @@ export default function ProjectsPage() {
                       )}>
                         <CalendarDays className="h-3 w-3" />
                         {fmtDate(p.dueDate, "MMM dd")}
-                        {daysLeft !== null && daysLeft < 0 && ` Â· ${Math.abs(daysLeft)}d overdue`}
-                        {daysLeft !== null && daysLeft === 0 && " Â· Today"}
+                        {daysLeft !== null && daysLeft < 0 && ` · ${Math.abs(daysLeft)}d overdue`}
+                        {daysLeft !== null && daysLeft === 0 && " · Today"}
                       </span>
                     )}
                     {p.completedAt && (
