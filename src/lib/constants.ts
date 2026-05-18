@@ -14,6 +14,7 @@ export const STATUSES = [
   "revision_approved",
   "revision_rejected",
   "locked",
+  "excused",
 ] as const;
 export type SubmissionStatus = (typeof STATUSES)[number];
 

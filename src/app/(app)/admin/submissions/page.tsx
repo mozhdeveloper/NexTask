@@ -236,7 +236,24 @@ export default function AdminSubmissionsPage() {
         onConfirm={() => {
           if (!holidayDate) return;
           workSettingsService.addHoliday(holidayDate, "Holiday");
-          toast.success(`${holidayDate} marked as a holiday.`);
+          const affected = submissions.filter(
+            (s) => s.date === holidayDate &&
+              (s.status === "missing" || s.status === "late" || s.status === "pending"),
+          );
+          if (affected.length > 0) {
+            toast(`${holidayDate} marked as holiday. ${affected.length} submission${affected.length > 1 ? "s" : ""} need attention.`, {
+              action: {
+                label: "Excuse all",
+                onClick: () => {
+                  affected.forEach((s) => submissionService.markStatus(s.id, "excused"));
+                  toast.success(`${affected.length} submission${affected.length > 1 ? "s" : ""} excused.`);
+                },
+              },
+              duration: 12000,
+            });
+          } else {
+            toast.success(`${holidayDate} marked as a holiday.`);
+          }
           setHolidayDate(null);
         }}
       />

@@ -41,6 +41,7 @@ const STATUS_DOT: Record<SubmissionStatus, string> = {
   revision_approved: "bg-emerald-400",
   revision_rejected: "bg-rose-400",
   locked: "bg-indigo-500",
+  excused: "bg-slate-400",
 };
 
 const STATUS_CHIP: Record<SubmissionStatus, string> = {
@@ -52,6 +53,7 @@ const STATUS_CHIP: Record<SubmissionStatus, string> = {
   revision_approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
   revision_rejected: "bg-rose-50 text-rose-700 border-rose-200",
   locked: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  excused: "bg-slate-50 text-slate-500 border-slate-200",
 };
 
 const LEGEND: SubmissionStatus[] = [

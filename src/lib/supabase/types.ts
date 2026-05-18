@@ -11,7 +11,8 @@ export type DbSubmissionStatus =
   | "revision_requested"
   | "revision_approved"
   | "revision_rejected"
-  | "locked";
+  | "locked"
+  | "excused";
 export type DbRevisionStatus = "pending" | "approved" | "rejected";
 export type DbProjectStatus = "planning" | "in_progress" | "review" | "completed" | "on_hold";
 export type DbBackupStatus = "running" | "completed" | "failed";

@@ -12,6 +12,7 @@ export const STATUS_META: Record<
   revision_approved: { label: "Revision Approved", bg: "bg-chip-mint", fg: "text-emerald-700", dot: "bg-emerald-500" },
   revision_rejected: { label: "Revision Rejected", bg: "bg-chip-rose", fg: "text-rose-700", dot: "bg-rose-500" },
   locked: { label: "Locked", bg: "bg-chip-indigo", fg: "text-indigo-700", dot: "bg-indigo-500" },
+  excused: { label: "Excused", bg: "bg-surface-subtle", fg: "text-ink-muted", dot: "bg-ink-soft" },
 };
 
 export const AVATAR_COLORS = [
