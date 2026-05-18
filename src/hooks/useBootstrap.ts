@@ -64,6 +64,12 @@ export function useBootstrap() {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
 
+    // Track whether this effect instance is still live.
+    // If cleanup fires (HMR, StrictMode unmount) before the async work
+    // finishes, we skip channel setup to avoid "cannot add callbacks
+    // after subscribe()" errors caused by stale channel registrations.
+    let mounted = true;
+
     // 1. Sync any existing session into authStore.
     void authService.syncFromSession();
 
@@ -88,12 +94,26 @@ export function useBootstrap() {
         backupService.refresh(),
         logService.refresh(),
       ]);
+
+      // Bail out early if cleanup has already fired.
+      if (!mounted) return;
+
       useDataStore.setState({ hydrated: true });
 
       const me = useAuthStore.getState().user;
       if (!me) return;
 
       await notificationService.refresh(me.id);
+
+      // Bail out again — cleanup may have fired during the notification load.
+      if (!mounted) return;
+
+      // Tear down any stale channels from a previous mount before
+      // re-subscribing.  This prevents "cannot add callbacks after
+      // subscribe()" errors caused by the Supabase client returning a
+      // cached, already-subscribed channel when the same name is reused.
+      await supabase.removeAllChannels();
+      channels.current = [];
 
       // ── Realtime: notifications (current user only) ──────────────────
       const notifChannel = supabase
@@ -238,11 +258,47 @@ export function useBootstrap() {
 
         channels.current.push(submissionsChannel, revisionsChannel, projectsChannel, usersChannel);
       }
+
+      // ── Realtime: submission_types (all roles — employees need live updates) ──
+      const submissionTypesChannel = supabase
+        .channel("rt:submission_types")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "submission_types" },
+          (payload) => {
+            const item = mapSubmissionType(payload.new as DbSubmissionTypeRow);
+            const { submissionTypes, setSubmissionTypes } = useDataStore.getState();
+            setSubmissionTypes([item, ...submissionTypes.filter((t) => t.id !== item.id)]);
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "submission_types" },
+          (payload) => {
+            const updated = mapSubmissionType(payload.new as DbSubmissionTypeRow);
+            const { submissionTypes, setSubmissionTypes } = useDataStore.getState();
+            setSubmissionTypes(submissionTypes.map((t) => (t.id === updated.id ? updated : t)));
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "DELETE", schema: "public", table: "submission_types" },
+          (payload) => {
+            const { submissionTypes, setSubmissionTypes } = useDataStore.getState();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setSubmissionTypes(submissionTypes.filter((t) => t.id !== (payload.old as any).id));
+          }
+        )
+        .subscribe();
+      channels.current.push(submissionTypesChannel);
     })();
 
     return () => {
+      mounted = false;
+      bootstrapped.current = false;
       sub.subscription.unsubscribe();
       channels.current.forEach((ch) => void supabase.removeChannel(ch));
+      channels.current = [];
     };
   }, []);
 }
