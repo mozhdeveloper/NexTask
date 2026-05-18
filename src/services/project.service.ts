@@ -86,6 +86,21 @@ export const projectService = {
       });
   },
 
+  async remove(id: string) {
+    const me = useAuthStore.getState().user;
+    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
+    const { projects, setProjects } = useDataStore.getState();
+    setProjects(projects.filter((p) => p.id !== id));
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) warn("remove", error);
+    logService.append({
+      userId: me.id,
+      action: "project.delete",
+      targetType: "project",
+      targetId: id,
+    });
+  },
+
   async refresh() {
     const { data, error } = await supabase
       .from("projects")

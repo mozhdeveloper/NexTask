@@ -25,6 +25,8 @@ import {
   seedNotifications,
 } from "@/mock-data/seed";
 import { STORAGE_PREFIX } from "@/lib/constants";
+import type { Role } from "@/lib/constants";
+import { DEFAULT_PERMISSIONS } from "@/lib/permissions";
 
 interface DataState {
   users: User[];
@@ -38,6 +40,7 @@ interface DataState {
   notifications: Notification[];
   workSettings: WorkSettings;
   autoBackupSettings: AutoBackupSettings;
+  permissions: Record<Role, string[]>;
   hydrated: boolean;
 
   setUsers: (u: User[]) => void;
@@ -50,6 +53,7 @@ interface DataState {
   setLogs: (l: ActivityLog[]) => void;
   setWorkSettings: (s: WorkSettings) => void;
   setAutoBackupSettings: (s: AutoBackupSettings) => void;
+  setPermissions: (p: Record<Role, string[]>) => void;
   reset: () => void;
 }
 
@@ -73,6 +77,7 @@ const initial = () => ({
     time: "22:00",
     lastAutoBackupDate: null,
   } as AutoBackupSettings,
+  permissions: { ...DEFAULT_PERMISSIONS },
 });
 
 export const useDataStore = create<DataState>()(
@@ -90,11 +95,12 @@ export const useDataStore = create<DataState>()(
       setLogs: (logs) => set({ logs }),
       setWorkSettings: (workSettings) => set({ workSettings }),
       setAutoBackupSettings: (autoBackupSettings) => set({ autoBackupSettings }),
+      setPermissions: (permissions) => set({ permissions }),
       reset: () => set({ ...initial() }),
     }),
     {
       name: `${STORAGE_PREFIX}data`,
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
       // Only persist lightweight settings — bulk data (submissions, logs, users etc.)
       // is always fetched fresh from Supabase on boot, so storing it in localStorage
@@ -102,6 +108,7 @@ export const useDataStore = create<DataState>()(
       partialize: (state) => ({
         workSettings: state.workSettings,
         autoBackupSettings: state.autoBackupSettings,
+        permissions: state.permissions,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrated = true;

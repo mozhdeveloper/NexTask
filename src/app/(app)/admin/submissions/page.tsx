@@ -23,6 +23,7 @@ import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 import { toast } from "sonner";
 import { Pagination } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 const STATUSES: SubmissionStatus[] = ["submitted", "late", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
 const PAGE_SIZE = 20;
@@ -148,7 +149,11 @@ export default function AdminSubmissionsPage() {
                 const u = users.find((x) => x.id === s.userId);
                 const isHolidayRow = workSettings.holidays.some((h) => h.date === s.date);
                 return (
-                  <TR key={s.id} className={isHolidayRow ? "opacity-60" : ""}>
+                  <TR
+                    key={s.id}
+                    className={cn("cursor-pointer hover:bg-surface-subtle", isHolidayRow && "opacity-60")}
+                    onClick={() => { setSelected(s); setOpen(true); }}
+                  >
                     <TD>
                       <div className="flex items-center gap-2">
                         {u && <Avatar className="h-7 w-7"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>}
@@ -164,7 +169,7 @@ export default function AdminSubmissionsPage() {
                       </div>
                     </TD>
                     <TD className="hidden md:table-cell text-ink-muted whitespace-nowrap">{fmtTime(s.submittedAt)}</TD>
-                    <TD>
+                    <TD onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>

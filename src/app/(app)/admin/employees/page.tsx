@@ -12,6 +12,7 @@ import { initials } from "@/lib/status";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown";
 import { EmployeeFormModal } from "@/components/modals/EmployeeFormModal";
+import { EmployeeDetailsModal } from "@/components/modals/EmployeeDetailsModal";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { userService } from "@/services/user.service";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ export default function EmployeesPage() {
   const [dept, setDept] = useState("all");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const [details, setDetails] = useState<User | null>(null);
   const [confirm, setConfirm] = useState<User | null>(null);
   const [page, setPage] = useState(1);
 
@@ -74,7 +76,11 @@ export default function EmployeesPage() {
               {pageRows.map((u) => {
                 const d = departments.find((x) => x.id === u.departmentId);
                 return (
-                  <TR key={u.id}>
+                  <TR
+                    key={u.id}
+                    className="cursor-pointer hover:bg-surface-subtle"
+                    onClick={() => setDetails(u)}
+                  >
                     <TD>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>
@@ -93,11 +99,16 @@ export default function EmployeesPage() {
                     </TD>
                     <TD>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => { setEditing(u); setOpen(true); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetails(u); }}>View details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditing(u); setOpen(true); }}>Edit</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem danger onClick={() => setConfirm(u)}>
+                          <DropdownMenuItem danger onClick={(e) => { e.stopPropagation(); setConfirm(u); }}>
                             {u.isActive ? "Deactivate" : "Reactivate"}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -118,6 +129,12 @@ export default function EmployeesPage() {
         </CardContent>
       </Card>
       <EmployeeFormModal open={open} onOpenChange={setOpen} editing={editing} />
+      <EmployeeDetailsModal
+        open={!!details}
+        onOpenChange={(v) => !v && setDetails(null)}
+        user={details}
+        onEdit={() => { if (details) { setEditing(details); setDetails(null); setOpen(true); } }}
+      />
       <ConfirmModal
         open={!!confirm}
         onOpenChange={(v) => !v && setConfirm(null)}
