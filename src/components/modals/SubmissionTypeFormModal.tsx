@@ -1,9 +1,10 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,12 +26,31 @@ import { useDataStore } from "@/store/dataStore";
 import { submissionTypeService } from "@/services/submissionType.service";
 import type { SubmissionType } from "@/types";
 
+// All supported file types grouped by category
+const FILE_TYPE_GROUPS = [
+  {
+    label: "Documents",
+    types: ["pdf", "doc", "docx"],
+  },
+  {
+    label: "Spreadsheets",
+    types: ["xls", "xlsx", "csv"],
+  },
+  {
+    label: "Images",
+    types: ["jpg", "jpeg", "png"],
+  },
+] as const;
+
+const ALL_FILE_TYPES = FILE_TYPE_GROUPS.flatMap((g) => g.types) as string[];
+
+const DEFAULT_FILE_TYPES = ["pdf", "docx", "xlsx", "jpg", "png"];
+
 const schema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  departmentId: z.string(), // empty string = all departments
+  departmentId: z.string(),
   requiredDaily: z.boolean(),
   deadlineTime: z.string().min(1, "Deadline time is required"),
-  allowedFileTypes: z.string().min(1, "At least one file type required"),
   maxFileSizeMB: z.number().min(1).max(100),
   isActive: z.boolean(),
 });
@@ -46,6 +66,8 @@ export function SubmissionTypeFormModal({
   editing?: SubmissionType | null;
 }) {
   const departments = useDataStore((s) => s.departments);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(DEFAULT_FILE_TYPES);
+  const [fileTypeError, setFileTypeError] = useState<string | null>(null);
 
   const {
     register,
@@ -61,13 +83,11 @@ export function SubmissionTypeFormModal({
       departmentId: "",
       requiredDaily: true,
       deadlineTime: "18:00",
-      allowedFileTypes: "pdf,docx,xlsx,jpg,png",
       maxFileSizeMB: 10,
       isActive: true,
     },
   });
 
-  // Populate form when editing prop changes
   useEffect(() => {
     if (editing) {
       reset({
@@ -75,35 +95,53 @@ export function SubmissionTypeFormModal({
         departmentId: editing.departmentId ?? "",
         requiredDaily: editing.requiredDaily,
         deadlineTime: editing.deadlineTime,
-        allowedFileTypes: editing.allowedFileTypes.join(", "),
         maxFileSizeMB: editing.maxFileSizeMB,
         isActive: editing.isActive,
       });
+      setSelectedTypes(editing.allowedFileTypes);
     } else {
       reset({
         name: "",
         departmentId: "",
         requiredDaily: true,
         deadlineTime: "18:00",
-        allowedFileTypes: "pdf,docx,xlsx,jpg,png",
         maxFileSizeMB: 10,
         isActive: true,
       });
+      setSelectedTypes(DEFAULT_FILE_TYPES);
     }
+    setFileTypeError(null);
   }, [editing, open, reset]);
 
+  const toggleType = (ext: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(ext) ? prev.filter((t) => t !== ext) : [...prev, ext]
+    );
+    setFileTypeError(null);
+  };
+
+  const toggleGroup = (types: readonly string[]) => {
+    const allOn = types.every((t) => selectedTypes.includes(t));
+    if (allOn) {
+      setSelectedTypes((prev) => prev.filter((t) => !types.includes(t)));
+    } else {
+      setSelectedTypes((prev) => Array.from(new Set([...prev, ...types])));
+    }
+    setFileTypeError(null);
+  };
+
   const onSubmit = async (v: V) => {
-    const allowedFileTypes = v.allowedFileTypes
-      .split(/[,\s]+/)
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
+    if (selectedTypes.length === 0) {
+      setFileTypeError("Select at least one file type.");
+      return;
+    }
 
     const payload = {
       name: v.name,
       departmentId: v.departmentId || null,
       requiredDaily: v.requiredDaily,
       deadlineTime: v.deadlineTime,
-      allowedFileTypes,
+      allowedFileTypes: selectedTypes,
       maxFileSizeMB: v.maxFileSizeMB,
       isActive: v.isActive,
     };
@@ -177,23 +215,89 @@ export function SubmissionTypeFormModal({
             {/* Max file size */}
             <div className="space-y-1.5">
               <Label>Max file size (MB)</Label>
-              <Input type="number" min={1} max={100} {...register("maxFileSizeMB", { valueAsNumber: true })} />
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                {...register("maxFileSizeMB", { valueAsNumber: true })}
+              />
               {errors.maxFileSizeMB && (
                 <p className="text-xs text-danger">{errors.maxFileSizeMB.message}</p>
               )}
             </div>
           </div>
 
-          {/* Allowed File Types */}
-          <div className="space-y-1.5">
-            <Label>Allowed file types</Label>
-            <Input
-              {...register("allowedFileTypes")}
-              placeholder="pdf, docx, xlsx, jpg, png"
-            />
-            <p className="text-xs text-ink-muted">Comma-separated extensions (without dot).</p>
-            {errors.allowedFileTypes && (
-              <p className="text-xs text-danger">{errors.allowedFileTypes.message}</p>
+          {/* Allowed File Types — toggle buttons grouped by category */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Allowed file types</Label>
+              <button
+                type="button"
+                className="text-[11px] text-primary hover:underline"
+                onClick={() =>
+                  setSelectedTypes(
+                    selectedTypes.length === ALL_FILE_TYPES.length ? [] : [...ALL_FILE_TYPES]
+                  )
+                }
+              >
+                {selectedTypes.length === ALL_FILE_TYPES.length ? "Deselect all" : "Select all"}
+              </button>
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-surface-border p-3">
+              {FILE_TYPE_GROUPS.map((group) => {
+                const allOn = group.types.every((t) => selectedTypes.includes(t));
+                const someOn = group.types.some((t) => selectedTypes.includes(t));
+                return (
+                  <div key={group.label}>
+                    <div className="mb-1.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.types)}
+                        className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] font-bold transition-colors ${
+                          allOn
+                            ? "border-primary bg-primary text-white"
+                            : someOn
+                            ? "border-primary bg-primary/20 text-primary"
+                            : "border-surface-border bg-white"
+                        }`}
+                      >
+                        {allOn && <Check className="h-2.5 w-2.5" />}
+                        {someOn && !allOn && <span>–</span>}
+                      </button>
+                      <span className="text-xs font-medium text-ink-muted">{group.label}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pl-6">
+                      {group.types.map((ext) => {
+                        const on = selectedTypes.includes(ext);
+                        return (
+                          <button
+                            key={ext}
+                            type="button"
+                            onClick={() => toggleType(ext)}
+                            className={`rounded-md border px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                              on
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-surface-border bg-white text-ink-muted hover:border-primary/40 hover:text-ink"
+                            }`}
+                          >
+                            {ext}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {fileTypeError && <p className="text-xs text-danger">{fileTypeError}</p>}
+
+            {selectedTypes.length > 0 && (
+              <p className="text-[11px] text-ink-muted">
+                {selectedTypes.length} type{selectedTypes.length !== 1 ? "s" : ""} selected:{" "}
+                <span className="font-medium">{selectedTypes.join(", ").toUpperCase()}</span>
+              </p>
             )}
           </div>
 

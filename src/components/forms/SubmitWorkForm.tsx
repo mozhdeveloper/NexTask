@@ -207,7 +207,14 @@ export function SubmitWorkForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Attachments <span className="font-normal text-ink-muted">(Optional)</span></Label>
+        <Label>
+          Attachments{" "}
+          {selectedType && (
+            <span className="font-normal text-ink-muted">
+              — {selectedType.name} (Optional)
+            </span>
+          )}
+        </Label>
         <div className="rounded-lg border border-dashed border-surface-border p-3">
           <div className="flex items-center justify-between gap-3">
             <label
