@@ -47,6 +47,19 @@ export default function AdminDashboard() {
   const submittedToday = todays.filter((s) => s.status !== "missing" && s.status !== "pending").length;
   const pendingToday = todays.filter((s) => s.status === "pending" || s.status === "missing").length;
   const overdue = todays.filter((s) => (s.status === "late" || s.status === "missing") && workSettingsService.isWorkingDay(s.date)).length;
+  const revisions = useDataStore((s) => s.revisions);
+  const pendingRevisions = revisions.filter((r) => r.status === "pending").length;
+
+  const startOfThisWeek = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay());
+    d.setHours(0, 0, 0, 0);
+    return d;
+  })();
+  const todayDate = new Date();
+  todayDate.setHours(23, 59, 59, 999);
+  const weekWorkingDays = workSettingsService.countWorkingDays(startOfThisWeek, todayDate);
+  const weekSubmissions = submissions.filter(s => new Date(s.date) >= startOfThisWeek && s.locked).length;
 
   const days = range === "30d" ? 30 : range === "14d" ? 14 : 7;
   const lineData = useMemo(() => {
@@ -105,12 +118,13 @@ export default function AdminDashboard() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard icon={Users} label="Total Employees" value={employees.length} sublabel="active" tint="indigo" />
         <StatCard icon={ClipboardList} label="Today's Submissions" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
         <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="awaiting" tint="amber" />
-        <StatCard icon={CalendarCheck2} label="This Week" value={`${submissions.filter(s => new Date(s.date) >= new Date(Date.now()-6*864e5) && s.locked).length}/${employees.length*7}`} sublabel="compliance" tint="violet" />
+        <StatCard icon={CalendarCheck2} label="This Week" value={`${weekSubmissions}/${weekWorkingDays * employees.length}`} sublabel="compliance" tint="violet" />
         <StatCard icon={AlertTriangle} label="Overdue" value={overdue} sublabel="late/missing" tint="rose" />
+        <StatCard icon={Bell} label="Revision Requests" value={pendingRevisions} sublabel="pending" tint="amber" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

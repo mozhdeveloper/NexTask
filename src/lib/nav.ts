@@ -27,7 +27,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "My Daily Work", href: "/my-work", icon: ClipboardList },
     { label: "My Submissions", href: "/my-submissions", icon: FileText },
     { label: "Calendar", href: "/calendar", icon: CalendarDays },
-    { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Profile", href: "/profile", icon: UserIcon },
     { label: "Settings", href: "/settings", icon: Settings },
   ],

@@ -71,7 +71,7 @@ export const mapAttachment = (r: DbAttachmentRow): Attachment => ({
   mime: r.mime,
   hashStub: r.hash_stub,
   dataUrl: r.data_url ?? undefined,
-  // storage_path kept off the domain type; resolve to signed url via service when needed
+  storagePath: r.storage_path ?? undefined,
 });
 
 export const mapSubmission = (

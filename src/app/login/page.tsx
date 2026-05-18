@@ -28,7 +28,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      authService.login(email, password);
+      await authService.login(email, password);
       toast.success("Welcome back!");
       router.replace("/dashboard");
     } catch (err) {

@@ -14,6 +14,8 @@ import type { Submission } from "@/types";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { RevisionRequestModal } from "./RevisionRequestModal";
+import { supabase, STORAGE_BUCKET } from "@/lib/supabase/client";
+import { logService } from "@/services/log.service";
 
 export function SubmissionDetailsModal({
   open,
@@ -34,12 +36,25 @@ export function SubmissionDetailsModal({
   const type = types.find((t) => t.id === submission.submissionTypeId);
   const subRevisions = revisions.filter((r) => r.submissionId === submission.id);
 
-  const downloadAtt = (a: Submission["attachments"][number]) => {
+  const downloadAtt = async (a: Submission["attachments"][number]) => {
     if (a.dataUrl) {
       const link = document.createElement("a");
       link.href = a.dataUrl;
       link.download = a.originalName;
       link.click();
+    } else if (a.storagePath) {
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(a.storagePath, 300);
+      if (!error && data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      } else {
+        downloadBlob(
+          a.originalName + ".txt",
+          `Unable to retrieve file.\nFilename: ${a.originalName}\nHash: ${a.hashStub}`,
+          "text/plain"
+        );
+      }
     } else {
       downloadBlob(
         a.originalName + ".txt",
@@ -47,6 +62,7 @@ export function SubmissionDetailsModal({
         "text/plain"
       );
     }
+    void logService.append({ action: "download.file", targetType: "attachment", targetId: a.id, userId: me!.id });
   };
 
   const canRequestRevision =

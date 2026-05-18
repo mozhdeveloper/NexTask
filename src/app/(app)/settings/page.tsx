@@ -34,7 +34,7 @@ export default function SettingsPage() {
     const days = workSettings.workingDays.includes(day)
       ? workSettings.workingDays.filter((d) => d !== day)
       : [...workSettings.workingDays, day].sort();
-    setWorkSettings({ ...workSettings, workingDays: days });
+    workSettingsService.setWorkingDays(days);
     toast.success("Working days updated.");
   };
 
@@ -78,7 +78,7 @@ export default function SettingsPage() {
                 role="switch"
                 aria-checked={autoBackupSettings.enabled}
                 onClick={() =>
-                  setAutoBackupSettings({ ...autoBackupSettings, enabled: !autoBackupSettings.enabled })
+                  workSettingsService.setAutoBackup({ enabled: !autoBackupSettings.enabled })
                 }
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   autoBackupSettings.enabled ? "bg-primary" : "bg-surface-border"
@@ -103,7 +103,7 @@ export default function SettingsPage() {
                     type="time"
                     value={autoBackupSettings.time}
                     onChange={(e) =>
-                      setAutoBackupSettings({ ...autoBackupSettings, time: e.target.value })
+                      workSettingsService.setAutoBackup({ time: e.target.value })
                     }
                   />
                   <p className="text-xs text-ink-muted">
@@ -117,7 +117,7 @@ export default function SettingsPage() {
                     placeholder="admin@nexvision.local"
                     value={autoBackupSettings.email}
                     onChange={(e) =>
-                      setAutoBackupSettings({ ...autoBackupSettings, email: e.target.value })
+                      workSettingsService.setAutoBackup({ email: e.target.value })
                     }
                   />
                   <p className="text-xs text-ink-muted">

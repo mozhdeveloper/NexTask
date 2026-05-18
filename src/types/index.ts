@@ -42,6 +42,7 @@ export interface Attachment {
   mime: string;
   hashStub: string;
   dataUrl?: string; // only for tiny files
+  storagePath?: string; // Supabase Storage path for large files
 }
 
 export interface Submission {

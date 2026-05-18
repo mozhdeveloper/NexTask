@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Database, Play } from "lucide-react";
+import { Database, Play, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { fmtBytes, fmtDate } from "@/lib/dates";
 import { RunBackupModal } from "@/components/modals/RunBackupModal";
 import { useRequireRole } from "@/hooks/useAuth";
 import { StatCard } from "@/components/cards/StatCard";
+import { downloadBlob } from "@/lib/helpers";
 
 export default function BackupsPage() {
   const { ready } = useRequireRole(["admin"]);
@@ -36,7 +37,7 @@ export default function BackupsPage() {
       <Card>
         <CardContent>
           <Table>
-            <THead><TR><TH>File</TH><TH>Size</TH><TH>Status</TH><TH>Created</TH></TR></THead>
+            <THead><TR><TH>File</TH><TH>Size</TH><TH>Status</TH><TH>Created</TH><TH></TH></TR></THead>
             <TBody>
               {[...backups].reverse().map((b) => (
                 <TR key={b.id}>
@@ -50,6 +51,23 @@ export default function BackupsPage() {
                       : <Badge variant="warning">Running</Badge>}
                   </TD>
                   <TD>{fmtDate(b.createdAt, "MMM dd, yyyy hh:mm a")}</TD>
+                  <TD>
+                    {b.status === "completed" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          downloadBlob(
+                            b.fileName,
+                            `Backup simulation\nFile: ${b.fileName}\nSize: ${fmtBytes(b.sizeBytes)}\nCreated: ${b.createdAt}`,
+                            "text/plain"
+                          )
+                        }
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </TD>
                 </TR>
               ))}
             </TBody>
