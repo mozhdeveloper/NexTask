@@ -63,14 +63,14 @@ export const revisionService = {
       targetId: r.id,
     });
     users
-      .filter((u) => u.role === "admin")
+      .filter((u) => u.role === "admin" || (u.role === "manager" && u.departmentId === me.departmentId))
       .forEach((a) =>
         notificationService.push({
           userId: a.id,
           type: "warning",
           title: "Revision request",
           body: `${me.name} requested a revision for ${sub.date}.`,
-          link: "/admin/revisions",
+          link: a.role === "admin" ? "/admin/revisions" : "/manager/revisions",
         })
       );
     return r;

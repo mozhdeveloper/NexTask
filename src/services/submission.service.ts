@@ -17,6 +17,7 @@ import type { DbAttachmentRow, DbSubmissionRow } from "@/lib/supabase/types";
 interface CreateInput {
   date: string;
   submissionTypeId: string;
+  taskTitle?: string;
   workSummary: string;
   tasksDetails?: string;
   files: File[];
@@ -135,7 +136,7 @@ export const submissionService = {
       versionNumber: existing ? existing.versionNumber + 1 : 1,
       parentSubmissionId: existing?.id ?? null,
       startedAt: existing?.startedAt ?? null,
-      taskTitle: existing?.taskTitle ?? null,
+      taskTitle: input.taskTitle?.trim() || existing?.taskTitle || null,
       filePath: attachments[0]
         ? buildSubmissionPath({
             username,

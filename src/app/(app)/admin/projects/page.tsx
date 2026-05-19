@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { ProjectFormModal } from "@/components/modals/ProjectFormModal";
 import { ProjectDetailsModal } from "@/components/modals/ProjectDetailsModal";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
-import { useRequireRole } from "@/hooks/useAuth";
+import { useRequireRole, useAuth } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
 import { projectService } from "@/services/project.service";
 import type { Project } from "@/types";
@@ -53,9 +53,23 @@ function StatusBadge({ status }: { status: Project["status"] }) {
 
 export default function ProjectsPage() {
   const { ready } = useRequireRole(["admin", "manager", "employee"]);
+  const me = useAuth();
   const canManage = usePermission("manage_projects");
-  const projects = useDataStore((s) => s.projects);
+  const allProjects = useDataStore((s) => s.projects);
   const users = useDataStore((s) => s.users);
+
+  // Managers only see projects that involve their department's employees.
+  const projects = useMemo(() => {
+    if (me?.role !== "manager" || !me.departmentId) return allProjects;
+    const deptIds = new Set(users.filter((u) => u.departmentId === me.departmentId).map((u) => u.id));
+    return allProjects.filter(
+      (p) =>
+        p.departmentId === me.departmentId ||
+        (p.ownerId != null && deptIds.has(p.ownerId)) ||
+        (p.lead != null && deptIds.has(p.lead)) ||
+        (p.members ?? []).some((mid) => deptIds.has(mid))
+    );
+  }, [allProjects, me?.role, me?.departmentId, users]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [details, setDetails] = useState<Project | null>(null);

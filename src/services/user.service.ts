@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 import { mapUser } from "@/lib/supabase/mappers";
 import type { DbUserRow } from "@/lib/supabase/types";
 import { logService } from "./log.service";
+import { notificationService } from "./notification.service";
 
 function warn(label: string, e: unknown) {
   // eslint-disable-next-line no-console
@@ -52,12 +53,35 @@ export const userService = {
       targetType: "user",
       targetId: user.id,
     });
+
+    // Notify all admins (excluding the creator themselves) that a new account was created.
+    useDataStore.getState().users
+      .filter((u) => u.role === "admin" && u.id !== me.id)
+      .forEach((a) =>
+        notificationService.push({
+          userId: a.id,
+          type: "info",
+          title: "New employee added",
+          body: `${user.name} (${user.role}) was added to the system.`,
+          link: "/admin/employees",
+        })
+      );
+
     return user;
   },
 
   async update(id: string, patch: Partial<User>) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
+
+    // Managers may only modify users in their own department and cannot
+    // change role or department assignment.
+    if (me.role === "manager") {
+      const target = useDataStore.getState().users.find((u) => u.id === id);
+      if (!target || target.departmentId !== me.departmentId) throw new Error("Forbidden");
+      if (patch.role !== undefined || patch.departmentId !== undefined)
+        throw new Error("Managers cannot change role or department assignment.");
+    }
 
     const { users, setUsers } = useDataStore.getState();
     setUsers(users.map((u) => (u.id === id ? { ...u, ...patch } : u)));
@@ -87,6 +111,11 @@ export const userService = {
   async toggleActive(id: string) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
+    // Managers may only toggle users within their own department.
+    if (me.role === "manager") {
+      const tgt = useDataStore.getState().users.find((u) => u.id === id);
+      if (!tgt || tgt.departmentId !== me.departmentId) throw new Error("Forbidden");
+    }
     const { users, setUsers } = useDataStore.getState();
     const target = users.find((u) => u.id === id);
     if (!target) return;

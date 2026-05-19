@@ -38,14 +38,31 @@ export async function POST(req: Request) {
   if (!auth.user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  // Authz: caller must be admin in public.users
+  // Authz: caller must be admin or manager in public.users
   const { data: caller } = await sb
     .from("users")
-    .select("role,is_active")
+    .select("role,is_active,department_id")
     .eq("auth_user_id", auth.user.id)
     .maybeSingle();
-  if (!caller || (caller as { role: string }).role !== "admin") {
+  const callerRole = (caller as { role: string } | null)?.role;
+  if (!caller || !["admin", "manager"].includes(callerRole ?? "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  // Managers may only create employee accounts within their own department.
+  if (callerRole === "manager") {
+    if (body.role !== "employee") {
+      return NextResponse.json(
+        { error: "Managers may only create employee accounts." },
+        { status: 403 }
+      );
+    }
+    const callerDept = (caller as { department_id: string | null }).department_id;
+    if (body.departmentId && callerDept && body.departmentId !== callerDept) {
+      return NextResponse.json(
+        { error: "You can only add employees to your own department." },
+        { status: 403 }
+      );
+    }
   }
 
   const password = body.password?.trim() || "password123";

@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pagination } from "@/components/ui/pagination";
 import { useDataStore } from "@/store/dataStore";
-import { useRequireRole } from "@/hooks/useAuth";
+import { useRequireRole, useAuth } from "@/hooks/useAuth";
 import { logService } from "@/services/log.service";
 import { downloadBlob, toCsv } from "@/lib/helpers";
 import { initials } from "@/lib/status";
@@ -117,9 +117,17 @@ const ACTION_GROUPS = [
 ];
 
 export default function ActivityLogPage() {
-  const { ready } = useRequireRole(["admin"]);
+  const { ready } = useRequireRole(["admin", "manager"]);
+  const me = useAuth();
+  const isManager = me?.role === "manager";
   const logs = useDataStore((s) => s.logs);
   const users = useDataStore((s) => s.users);
+
+  // For managers, compute the set of user IDs in their department.
+  const deptEmployeeIds = useMemo(() => {
+    if (!isManager || !me?.departmentId) return null;
+    return new Set(users.filter((u) => u.departmentId === me.departmentId).map((u) => u.id));
+  }, [isManager, me?.departmentId, users]);
   const [q, setQ] = useState("");
   const [userFilter, setUserFilter] = useState("all");
   const [actionFilter, setActionFilter] = useState("all");
@@ -148,6 +156,8 @@ export default function ActivityLogPage() {
 
   const rows = useMemo(() => {
     return logs.filter((l) => {
+      // Managers only see activity from their department's employees.
+      if (deptEmployeeIds && !deptEmployeeIds.has(l.userId)) return false;
       const u = users.find((x) => x.id === l.userId);
       if (q) {
         const hay = [u?.name ?? "", l.action, getMeta(l.action).label, l.targetType ?? "", l.targetId ?? "", l.ip ?? ""]
@@ -161,7 +171,7 @@ export default function ActivityLogPage() {
       }
       return true;
     });
-  }, [logs, users, q, userFilter, actionFilter]);
+  }, [logs, users, q, userFilter, actionFilter, deptEmployeeIds]);
 
   useEffect(() => { setPage(1); }, [q, userFilter, actionFilter]);
 
@@ -200,8 +210,8 @@ export default function ActivityLogPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Activity Log"
-        description="Full audit trail of every action in the workspace."
+        title={isManager ? "Team Activity Log" : "Activity Log"}
+        description={isManager ? "Audit trail of actions by your department's employees." : "Full audit trail of every action in the workspace."}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={refresh} disabled={refreshing}>

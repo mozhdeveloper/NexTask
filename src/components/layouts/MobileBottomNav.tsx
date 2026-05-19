@@ -28,7 +28,7 @@ const ITEMS_BY_ROLE: Record<string, Item[]> = {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Employees", href: "/manager/employees", icon: Users },
     { label: "Calendar", href: "/calendar", icon: CalendarDays },
-    { label: "Projects", href: "/projects", icon: FolderKanban },
+    { label: "Projects", href: "/manager/projects", icon: FolderKanban },
     { label: "Settings", href: "/settings", icon: Settings },
   ],
   employee: [

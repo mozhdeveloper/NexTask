@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { backupService } from "@/services/backup.service";
+import { notificationService } from "@/services/notification.service";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Database } from "lucide-react";
 
@@ -17,6 +19,7 @@ export function RunBackupModal({
   const [progress, setProgress] = useState(0);
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  const me = useAuth();
 
   const start = async () => {
     setRunning(true);
@@ -26,6 +29,15 @@ export function RunBackupModal({
       const log = await backupService.run((p) => setProgress(p));
       setDone(log.fileName);
       toast.success("Backup completed.");
+      if (me?.id) {
+        notificationService.push({
+          userId: me.id,
+          type: "success",
+          title: "Backup completed",
+          body: `${log.fileName} was backed up successfully.`,
+          link: "/admin/backups",
+        });
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

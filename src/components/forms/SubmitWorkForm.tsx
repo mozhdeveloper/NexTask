@@ -22,6 +22,7 @@ import { todayISO } from "@/lib/dates";
 
 const schema = z.object({
   date: z.string().min(1, "Date is required"),
+  taskTitle: z.string().max(120).optional(),
   workSummary: z.string().min(3, "Add a brief summary"),
   tasksDetails: z.string().optional(),
 });
@@ -77,6 +78,7 @@ export function SubmitWorkForm({
     resolver: zodResolver(schema),
     defaultValues: {
       date: today,
+      taskTitle: existing?.taskTitle ?? "",
       workSummary: existing?.workSummary ?? "",
       tasksDetails: existing?.tasksDetails ?? "",
     },
@@ -133,6 +135,7 @@ export function SubmitWorkForm({
       await submissionService.create({
         date: v.date,
         submissionTypeId: selectedType.id,
+        taskTitle: v.taskTitle?.trim() || undefined,
         workSummary: v.workSummary,
         tasksDetails: v.tasksDetails ?? "",
         files,
@@ -199,6 +202,18 @@ export function SubmitWorkForm({
           </Select>
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <Label htmlFor="taskTitle">
+          Task Title <span className="font-normal text-ink-muted">(optional)</span>
+        </Label>
+        <Input
+          id="taskTitle"
+          placeholder="What are you working on today?"
+          disabled={locked}
+          {...register("taskTitle")}
+        />
+      </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="date">Date</Label>
