@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, X } from "lucide-react";
-import { Logo } from "@/components/brand/Logo";
 import { NAV_BY_ROLE } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,13 +41,17 @@ export function Sidebar({
       <div
         className={cn(
           "flex h-16 flex-shrink-0 items-center border-b border-surface-border",
-          collapsed ? "justify-center" : "gap-2 px-4"
+          collapsed ? "justify-center" : "px-6"
         )}
       >
         {collapsed ? (
-          <Logo size={28} className="!gap-0 [&>span]:hidden" />
+          <span className="text-xl font-extrabold tracking-tighter text-ink select-none">
+            N<span className="text-primary">T</span>
+          </span>
         ) : (
-          <Logo size={28} />
+          <span className="text-2xl font-extrabold tracking-tight text-ink select-none">
+            Nex<span className="text-primary">Task</span>
+          </span>
         )}
         {!collapsed && onClose && (
           <button
