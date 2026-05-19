@@ -10,7 +10,6 @@ import {
   Send,
   Users,
   ClipboardList,
-  CalendarCheck2,
 } from "lucide-react";
 import { useDataStore } from "@/store/dataStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,8 +29,8 @@ import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsMod
 import type { Submission } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { reportService } from "@/services/report.service";
-import { workSettingsService } from "@/services/workSettings.service";
 import { complianceService } from "@/services/compliance.service";
 
 export default function AdminDashboard() {
@@ -42,45 +41,58 @@ export default function AdminDashboard() {
   const [selected, setSelected] = useState<Submission | null>(null);
   const [open, setOpen] = useState(false);
 
+  const me = useAuth();
+  const isManager = me?.role === "manager";
+  const scopeDeptId = isManager ? (me?.departmentId ?? null) : null;
+
   const today = todayISO();
-  const employees = users.filter((u) => u.isActive && (u.role === "employee" || u.role === "manager"));
-  const todays = submissions.filter((s) => s.date === today);
-  // Compliance counts include virtual "missing" rows for employees with no submission.
-  const counts = complianceService.dayCounts(today);
+  const employees = users.filter(
+    (u) =>
+      u.isActive &&
+      (u.role === "employee" || u.role === "manager") &&
+      (!scopeDeptId || u.departmentId === scopeDeptId),
+  );
+  const employeeIds = new Set(employees.map((e) => e.id));
+  const todays = submissions.filter((s) => s.date === today && employeeIds.has(s.userId));
+  // Compliance counts include virtual "missing" rows; scoped to dept when manager.
+  const counts = complianceService.dayCounts(today, scopeDeptId);
   const submittedToday = counts.submitted;
   const pendingToday = counts.pending;
   const missingToday = counts.missing;
   const lateToday = counts.late;
-  const overdue = lateToday + missingToday;
   const revisions = useDataStore((s) => s.revisions);
-  const pendingRevisions = revisions.filter((r) => r.status === "pending").length;
-
-  const startOfThisWeek = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay());
-    d.setHours(0, 0, 0, 0);
-    return d;
-  })();
-  const todayDate = new Date();
-  todayDate.setHours(23, 59, 59, 999);
-  const weekWorkingDays = workSettingsService.countWorkingDays(startOfThisWeek, todayDate);
-  const employeeIds = new Set(employees.map((e) => e.id));
-  const weekSubmissions = submissions.filter(
-    (s) => new Date(s.date) >= startOfThisWeek && s.locked && employeeIds.has(s.userId)
+  const pendingRevisions = revisions.filter(
+    (r) => r.status === "pending" && (!scopeDeptId || employeeIds.has(r.userId)),
   ).length;
 
   const days = range === "30d" ? 30 : range === "14d" ? 14 : 7;
   const lineData = useMemo(() => {
+    const eIds = new Set(
+      users
+        .filter(
+          (u) =>
+            u.isActive &&
+            (u.role === "employee" || u.role === "manager") &&
+            (!scopeDeptId || u.departmentId === scopeDeptId),
+        )
+        .map((u) => u.id),
+    );
     const out: { day: string; count: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const iso = d.toISOString().slice(0, 10);
-      const c = submissions.filter((s) => s.date === iso && s.status !== "missing" && s.status !== "pending").length;
+      const c = submissions.filter(
+        (s) =>
+          s.date === iso &&
+          s.status !== "missing" &&
+          s.status !== "pending" &&
+          eIds.has(s.userId),
+      ).length;
       out.push({ day: fmtDate(d, "MMM dd"), count: c });
     }
     return out;
-  }, [submissions, days]);
+  }, [submissions, days, scopeDeptId, users]);
 
   const donutData = [
     { name: "Submitted", value: submittedToday, color: "#66B2B2" },
@@ -91,11 +103,11 @@ export default function AdminDashboard() {
   const totalExpected = counts.expected || employees.length;
 
   const recent = [...submissions]
-    .filter((s) => s.locked)
+    .filter((s) => s.locked && employeeIds.has(s.userId))
     .sort((a, b) => (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""))
     .slice(0, 6);
 
-  const byDept = departments.map((d) => {
+  const byDept = (scopeDeptId ? departments.filter((d) => d.id === scopeDeptId) : departments).map((d) => {
     const deptUsers = users.filter((u) => u.departmentId === d.id && u.isActive);
     const expected = deptUsers.length;
     const submitted = todays.filter(
@@ -105,7 +117,7 @@ export default function AdminDashboard() {
   });
 
   const overdueCells = complianceService
-    .dayOverview(today)
+    .dayOverview(today, scopeDeptId)
     .filter((c) => c.effectiveStatus === "late" || c.effectiveStatus === "missing")
     .slice(0, 5);
 
@@ -118,8 +130,8 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Admin Overview"
-        description="Office-wide compliance, today’s status, and quick actions."
+        title={isManager ? "Team Overview" : "Admin Overview"}
+        description={isManager ? "Your team's compliance and today's submission status." : "Office-wide compliance, today's status, and quick actions."}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={sendReminders}><Send className="h-4 w-4" /> Send reminders</Button>
@@ -268,7 +280,7 @@ export default function AdminDashboard() {
             <QuickAction icon={Send} label="Send Reminders" tint="bg-chip-amber" onClick={sendReminders} />
             <QuickAction icon={Download} label="Download Report" tint="bg-chip-teal" onClick={downloadReport} />
             <QuickAction icon={CalendarDays} label="View Calendar" tint="bg-chip-violet" href="/calendar" />
-            <QuickAction icon={PlusCircle} label="Add Employee" tint="bg-chip-mint" href="/admin/employees" />
+            <QuickAction icon={isManager ? Users : PlusCircle} label={isManager ? "My Team" : "Add Employee"} tint="bg-chip-mint" href={isManager ? "/manager/employees" : "/admin/employees"} />
           </div>
         </CardContent>
       </Card>

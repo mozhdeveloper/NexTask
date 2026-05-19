@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { initials } from "@/lib/status";
 import { fmtDate } from "@/lib/dates";
 import { EditProfileModal } from "@/components/modals/EditProfileModal";
+import { submissionService } from "@/services/submission.service";
 
 export default function ProfilePage() {
   const user = useAuth();
@@ -22,6 +23,12 @@ export default function ProfilePage() {
   const dept = departments.find((d) => d.id === user.departmentId);
   const mine = submissions.filter((s) => s.userId === user.id);
   const submitted = mine.filter((s) => s.locked).length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => submissionService.todayStats(user.id), [user, submissions]);
+  const monthRate = stats.month.expected > 0
+    ? Math.round((stats.month.submitted / stats.month.expected) * 100)
+    : null;
+  const lateCount = mine.filter((s) => s.status === "late").length;
 
   return (
     <div className="space-y-6">
@@ -52,23 +59,53 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardHeader><CardTitle>Submissions</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Total Submitted</CardTitle></CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold">{submitted}</div>
-            <div className="text-sm text-ink-muted">total submitted</div>
+            <div className="text-3xl font-bold">{submitted}</div>
+            <div className="text-sm text-ink-muted">all time</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader><CardTitle>This Month</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {monthRate !== null ? `${monthRate}%` : "—"}
+            </div>
+            <div className="text-sm text-ink-muted">
+              {stats.month.submitted}/{stats.month.expected} working days
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>This Week</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {stats.week.submitted}/{stats.week.expected}
+            </div>
+            <div className="text-sm text-ink-muted">submissions</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Late Submissions</CardTitle></CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{lateCount}</div>
+            <div className="text-sm text-ink-muted">all time</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Department</CardTitle></CardHeader>
           <CardContent>
-            <div className="text-lg font-semibold">{dept?.name}</div>
-            <div className="text-sm text-ink-muted">{dept?.description}</div>
+            <div className="text-lg font-semibold">{dept?.name ?? "—"}</div>
+            {dept?.description && <div className="text-sm text-ink-muted">{dept.description}</div>}
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Joined</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Member Since</CardTitle></CardHeader>
           <CardContent>
             <div className="text-lg font-semibold">{fmtDate(user.createdAt)}</div>
           </CardContent>

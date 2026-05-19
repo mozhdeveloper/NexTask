@@ -22,17 +22,22 @@ export interface DayCell {
   effectiveStatus: SubmissionStatus | null;
 }
 
-function activeWorkers(users: User[]): User[] {
-  return users.filter((u) => u.isActive && (u.role === "employee" || u.role === "manager"));
+function activeWorkers(users: User[], deptId?: string | null): User[] {
+  return users.filter(
+    (u) =>
+      u.isActive &&
+      (u.role === "employee" || u.role === "manager") &&
+      (!deptId || u.departmentId === deptId),
+  );
 }
 
 /**
  * Returns one cell per active employee for a single date, including synthetic
  * "missing" / "pending" entries for employees without a submission row.
  */
-export function dayOverview(date: string): DayCell[] {
+export function dayOverview(date: string, deptId?: string | null): DayCell[] {
   const { users, submissions } = useDataStore.getState();
-  const workers = activeWorkers(users);
+  const workers = activeWorkers(users, deptId);
   const today = todayISO();
   const isWorking = workSettingsService.isWorkingDay(date);
 
@@ -56,8 +61,8 @@ export function dayOverview(date: string): DayCell[] {
 /**
  * Aggregate counts for a given date using the same rules as dayOverview.
  */
-export function dayCounts(date: string) {
-  const cells = dayOverview(date);
+export function dayCounts(date: string, deptId?: string | null) {
+  const cells = dayOverview(date, deptId);
   let submitted = 0;
   let pending = 0;
   let missing = 0;
@@ -91,14 +96,14 @@ export function dayCounts(date: string) {
  * Returns one DayCell per active worker per working day in [start, end].
  * Used by reports to produce a complete compliance picture (including no-shows).
  */
-export function rangeOverview(start: string, end: string): DayCell[] {
+export function rangeOverview(start: string, end: string, deptId?: string | null): DayCell[] {
   const out: DayCell[] = [];
   const startD = new Date(start);
   const endD = new Date(end);
   for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
     const iso = d.toISOString().slice(0, 10);
     if (!workSettingsService.isWorkingDay(iso)) continue;
-    for (const cell of dayOverview(iso)) {
+    for (const cell of dayOverview(iso, deptId)) {
       if (cell.effectiveStatus !== null) out.push(cell);
     }
   }

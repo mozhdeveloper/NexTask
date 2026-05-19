@@ -14,6 +14,7 @@ import {
   HardDrive,
   Inbox,
   ListChecks,
+  Bell,
 } from "lucide-react";
 
 export interface NavItem {
@@ -29,6 +30,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "My Submissions", href: "/my-submissions", icon: FileText },
     { label: "Calendar", href: "/calendar", icon: CalendarDays },
     { label: "Projects", href: "/projects", icon: FolderKanban },
+    { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Profile", href: "/profile", icon: UserIcon },
     { label: "Settings", href: "/settings", icon: Settings },
   ],
@@ -40,6 +42,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Calendar", href: "/calendar", icon: CalendarDays },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Projects", href: "/manager/projects", icon: FolderKanban },
+    { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Profile", href: "/profile", icon: UserIcon },
     { label: "Settings", href: "/settings", icon: Settings },
   ],
@@ -55,6 +58,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Submission Types", href: "/admin/submission-types", icon: ListChecks },
     { label: "Activity Log", href: "/admin/activity-log", icon: ScrollText },
     { label: "Users & Roles", href: "/admin/users-roles", icon: ShieldCheck },
+    { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Settings", href: "/settings", icon: Settings },
   ],
 };
