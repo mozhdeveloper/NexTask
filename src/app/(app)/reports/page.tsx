@@ -11,6 +11,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useRequireRole } from "@/hooks/useAuth";
+import { useDataStore } from "@/store/dataStore";
 import { reportService, type ReportType, type ExportFormat, type ScopeKind, type ReportScope } from "@/services/report.service";
 import { todayISO } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,13 @@ const PREVIEW_LIMIT = 25;
 export default function ReportsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
 
+  // Subscribe to store slices so the preview and counts stay in sync
+  // when underlying data changes (new submissions, backups, etc.).
+  const submissions = useDataStore((s) => s.submissions);
+  const users       = useDataStore((s) => s.users);
+  const departments = useDataStore((s) => s.departments);
+  const backups     = useDataStore((s) => s.backups);
+
   const [type, setType] = useState<ReportType>("daily");
   const [scopeKind, setScopeKind] = useState<ScopeKind>("today");
   const [anchor, setAnchor] = useState<string>(todayISO());
@@ -66,10 +74,21 @@ export default function ReportsPage() {
     return { kind: scopeKind, date: anchor };
   }, [scopeKind, anchor, rangeStart, rangeEnd]);
 
+  // Reactive preview — reruns when data or scope changes.
   const rows = useMemo(
     () => (ready ? reportService.preview(type, scope) : []),
-    [ready, type, scope],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ready, type, scope, submissions, users, departments, backups],
   );
+
+  // Per-card live counts for the current scope.
+  const cardCounts = useMemo(() => {
+    if (!ready) return {} as Record<ReportType, number>;
+    return Object.fromEntries(
+      REPORTS.map((r) => [r.type, reportService.preview(r.type, scope).length]),
+    ) as Record<ReportType, number>;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, scope, submissions, users, departments, backups]);
 
   const range = useMemo(() => reportService.resolveRange(scope), [scope]);
   const meta = REPORTS.find((r) => r.type === type)!;
@@ -117,8 +136,20 @@ export default function ReportsPage() {
                 <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", r.tint)}>
                   <r.icon className="h-5 w-5" />
                 </span>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-ink">{r.title}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-ink">{r.title}</div>
+                    {typeof cardCounts[r.type] === "number" && (
+                      <span className={cn(
+                        "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                        active
+                          ? "border-primary/30 bg-primary/10 text-primary"
+                          : "border-surface-border bg-surface-subtle text-ink-muted",
+                      )}>
+                        {cardCounts[r.type]}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-xs text-ink-muted">{r.description}</p>
                 </div>
               </div>
