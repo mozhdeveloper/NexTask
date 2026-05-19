@@ -35,7 +35,7 @@ export function RevisionRequestModal({
     }
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) setReason(""); onOpenChange(v); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Request a revision</DialogTitle>

@@ -180,14 +180,19 @@ export default function ActivityLogPage() {
   const pageRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   // Stats
+  // For stats cards, use only the dept-scoped logs when the viewer is a manager.
+  const scopedLogs = deptEmployeeIds
+    ? logs.filter((l) => deptEmployeeIds.has(l.userId))
+    : logs;
+
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const todayCount = logs.filter((l) => new Date(l.createdAt) >= todayStart).length;
-  const uniqueUsers = new Set(logs.filter((l) => {
+  const todayCount = scopedLogs.filter((l) => new Date(l.createdAt) >= todayStart).length;
+  const uniqueUsers = new Set(scopedLogs.filter((l) => {
     const d = new Date(l.createdAt);
     return (Date.now() - d.getTime()) < 7 * 86400_000;
   }).map((l) => l.userId)).size;
-  const lastEvent = logs[0];
+  const lastEvent = scopedLogs[0];
 
   const exportCsv = () => {
     downloadBlob(
@@ -233,7 +238,7 @@ export default function ActivityLogPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Total events</p>
-                <p className="mt-1 text-2xl font-semibold">{logs.length.toLocaleString()}</p>
+                <p className="mt-1 text-2xl font-semibold">{scopedLogs.length.toLocaleString()}</p>
               </div>
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
                 <Activity className="h-5 w-5 text-blue-500" />
@@ -333,7 +338,7 @@ export default function ActivityLogPage() {
           </div>
           <p className="mt-3 text-xs text-ink-muted">
             Showing <span className="font-medium text-ink">{rows.length.toLocaleString()}</span> event{rows.length !== 1 ? "s" : ""}
-            {logs.length !== rows.length && ` of ${logs.length.toLocaleString()} total`}
+            {scopedLogs.length !== rows.length && ` of ${scopedLogs.length.toLocaleString()} total`}
           </p>
         </CardContent>
       </Card>

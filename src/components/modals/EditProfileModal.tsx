@@ -49,6 +49,10 @@ const schema = z
       !v.newPassword ||
       (v.newPassword.length >= 8 && v.newPassword === v.confirmPassword),
     { message: "Passwords must match and be at least 8 chars", path: ["confirmPassword"] }
+  )
+  .refine(
+    (v) => !v.newPassword || (v.currentPassword?.trim().length ?? 0) >= 1,
+    { message: "Current password is required to set a new one", path: ["currentPassword"] }
   );
 type V = z.infer<typeof schema>;
 
@@ -123,8 +127,13 @@ export function EditProfileModal({
         setUser({ ...user, ...userPatch } as typeof user);
       }
 
-      // Password change
-      if (v.newPassword) {
+      // Password change — verify current password first, then update
+      if (v.newPassword && v.currentPassword) {
+        const { error: verifyErr } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: v.currentPassword,
+        });
+        if (verifyErr) throw new Error("Current password is incorrect.");
         const { error } = await supabase.auth.updateUser({ password: v.newPassword });
         if (error) throw new Error(error.message);
         void logService.append({ userId: user.id, action: "auth.password_change", targetType: "user", targetId: user.id });
