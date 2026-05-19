@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft, ChevronRight, Plus,
-  CalendarDays, LayoutGrid, List, FileText,
+  CalendarDays, LayoutGrid, List, FileText, Filter,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -58,6 +58,19 @@ const STATUS_CHIP: Record<SubmissionStatus, string> = {
 
 const LEGEND: SubmissionStatus[] = [
   "submitted", "pending", "late", "missing", "revision_requested",
+];
+
+const STATUS_FILTER_OPTIONS: { value: SubmissionStatus | "all"; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "submitted", label: "Submitted" },
+  { value: "pending", label: "Pending" },
+  { value: "late", label: "Late" },
+  { value: "missing", label: "Missing" },
+  { value: "revision_requested", label: "Revision Requested" },
+  { value: "revision_approved", label: "Revision Approved" },
+  { value: "revision_rejected", label: "Revision Rejected" },
+  { value: "excused", label: "Excused" },
+  { value: "locked", label: "Locked" },
 ];
 
 // ─── DayCell ─────────────────────────────────────────────────────────────────
@@ -150,6 +163,7 @@ export default function CalendarPage() {
   const [modal, setModal] = useState<Submission | null>(null);
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
+  const [filterStatus, setFilterStatus] = useState<SubmissionStatus | "all">("all");
 
   if (!user) return null;
 
@@ -159,12 +173,15 @@ export default function CalendarPage() {
   const isSelf = effectiveId === user.id;
   const today = new Date();
 
-  // ── day map ──────────────────────────────────────────────────────────────
+  // ── day map (filter-aware) ────────────────────────────────────────────────
   const dayMap = useMemo(() => {
     const m = new Map<string, Submission>();
-    submissions.filter((s) => s.userId === effectiveId).forEach((s) => m.set(s.date, s));
+    submissions
+      .filter((s) => s.userId === effectiveId)
+      .filter((s) => filterStatus === "all" || s.status === filterStatus)
+      .forEach((s) => m.set(s.date, s));
     return m;
-  }, [effectiveId, submissions]);
+  }, [effectiveId, submissions, filterStatus]);
 
   const pickedSub = picked ? dayMap.get(format(picked, "yyyy-MM-dd")) : undefined;
 
@@ -187,8 +204,9 @@ export default function CalendarPage() {
   const listItems = useMemo(() =>
     [...submissions]
       .filter((s) => s.userId === effectiveId)
+      .filter((s) => filterStatus === "all" || s.status === filterStatus)
       .sort((a, b) => b.date.localeCompare(a.date)),
-    [submissions, effectiveId]
+    [submissions, effectiveId, filterStatus]
   );
 
   // ── period label ──────────────────────────────────────────────────────────
@@ -249,30 +267,60 @@ export default function CalendarPage() {
             </Button>
           </div>
         ) : (
-          <div className="text-sm font-semibold text-ink">All Submissions</div>
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-semibold text-ink">All Submissions</div>
+            {filterStatus !== "all" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                {STATUS_META[filterStatus]?.label}
+                <button onClick={() => setFilterStatus("all")} className="ml-0.5 hover:text-primary/70">×</button>
+              </span>
+            )}
+          </div>
         )}
 
-        {/* View switcher */}
-        <div className="flex items-center rounded-lg border border-surface-border bg-white p-1 gap-0.5">
-          {([
-            { key: "month", Icon: LayoutGrid,  label: "Month" },
-            { key: "week",  Icon: CalendarDays, label: "Week"  },
-            { key: "list",  Icon: List,          label: "List"  },
-          ] as const).map(({ key, Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setView(key)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                view === key
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
-              )}
+        <div className="flex items-center gap-2">
+          {/* Status filter */}
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3.5 w-3.5 text-ink-muted" />
+            <Select
+              value={filterStatus}
+              onValueChange={(v) => setFilterStatus(v as SubmissionStatus | "all")}
             >
-              <Icon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
+              <SelectTrigger className="h-8 w-40 text-xs">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_FILTER_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value} className="text-xs">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* View switcher */}
+          <div className="flex items-center rounded-lg border border-surface-border bg-white p-1 gap-0.5">
+            {([
+              { key: "month", Icon: LayoutGrid,  label: "Month" },
+              { key: "week",  Icon: CalendarDays, label: "Week"  },
+              { key: "list",  Icon: List,          label: "List"  },
+            ] as const).map(({ key, Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  view === key
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

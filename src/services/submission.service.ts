@@ -205,17 +205,22 @@ export const submissionService = {
       targetId: sub.id,
     });
 
+    // Notify admins and managers; use "warning" for late submissions.
+    const isLate = status === "late";
     users
-      .filter((u) => u.role === "admin")
-      .forEach((admin) =>
+      .filter((u) => u.role === "admin" || u.role === "manager")
+      .forEach((recipient) => {
+        const link = recipient.role === "admin" ? "/admin/submissions" : "/manager/submissions";
         notificationService.push({
-          userId: admin.id,
-          type: "info",
-          title: "New submission received",
-          body: `${me.name} submitted "${type.name}" for ${input.date}.`,
-          link: "/admin/submissions",
-        })
-      );
+          userId: recipient.id,
+          type: isLate ? "warning" : "info",
+          title: isLate ? "Late submission received" : "New submission received",
+          body: isLate
+            ? `${me.name} submitted "${type.name}" for ${input.date} past the deadline.`
+            : `${me.name} submitted "${type.name}" for ${input.date}.`,
+          link,
+        });
+      });
 
     return sub;
   },
