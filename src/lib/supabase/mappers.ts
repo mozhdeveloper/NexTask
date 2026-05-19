@@ -93,6 +93,8 @@ export const mapSubmission = (
   versionNumber: r.version_number,
   parentSubmissionId: r.parent_submission_id,
   filePath: r.file_path,
+  startedAt: r.started_at ?? null,
+  taskTitle: r.task_title ?? null,
 });
 
 export const mapRevision = (r: DbRevisionRow): RevisionRequest => ({
@@ -171,6 +173,8 @@ export const mapWorkSettings = (
 ): WorkSettings => ({
   workingDays: ws?.working_days ?? [1, 2, 3, 4, 5],
   holidays: holidays.map(mapHoliday),
+  workStartTime: ws?.work_start_time?.slice(0, 5) ?? "09:00",
+  workEndTime: ws?.work_end_time?.slice(0, 5) ?? "18:00",
 });
 
 export const mapAutoBackupSettings = (

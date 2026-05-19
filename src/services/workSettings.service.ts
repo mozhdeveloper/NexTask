@@ -32,6 +32,41 @@ export const workSettingsService = {
     return true;
   },
 
+  /** True when current time-of-day is within the configured working window. */
+  isWithinWorkHours(date: Date = new Date()): boolean {
+    const ws = useDataStore.getState().workSettings;
+    const [sh, sm] = (ws.workStartTime ?? "09:00").split(":").map(Number);
+    const [eh, em] = (ws.workEndTime ?? "18:00").split(":").map(Number);
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    const now = date.getHours() * 60 + date.getMinutes();
+    return now >= start && now <= end;
+  },
+
+  /** True if current time is past the work-end hour for the given (today's) date. */
+  isPastWorkEnd(date: Date = new Date()): boolean {
+    const ws = useDataStore.getState().workSettings;
+    const [eh, em] = (ws.workEndTime ?? "18:00").split(":").map(Number);
+    return date.getHours() * 60 + date.getMinutes() > eh * 60 + em;
+  },
+
+  setWorkHours(start: string, end: string) {
+    const ws = useDataStore.getState().workSettings;
+    useDataStore.getState().setWorkSettings({ ...ws, workStartTime: start, workEndTime: end });
+    supabase
+      .from("work_settings")
+      .upsert({ id: true, work_start_time: start, work_end_time: end })
+      .then(({ error }) => {
+        if (error) warn("setWorkHours", error);
+      });
+    logService.append({
+      userId: meId(),
+      action: "settings.work_hours_update",
+      targetType: "work_settings",
+      targetId: null,
+    });
+  },
+
   isHoliday(dateStr: string): boolean {
     return useDataStore.getState().workSettings.holidays.some((h) => h.date === dateStr);
   },

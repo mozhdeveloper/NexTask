@@ -165,6 +165,8 @@ describe("mapSubmission", () => {
     parent_submission_id: null,
     file_path: "employees/emp/2026/05-May/18/file.pdf",
     created_at: "2026-05-18T14:00:00Z",
+    started_at: null,
+    task_title: null,
   };
 
   it("should map user_id to userId", () => {
@@ -352,6 +354,8 @@ describe("mapWorkSettings", () => {
     auto_backup_time: "22:00",
     last_auto_backup_date: null,
     updated_at: "2026-05-18T00:00:00Z",
+    work_start_time: "09:00",
+    work_end_time: "18:00",
   };
 
   it("should map working_days to workingDays array", () => {

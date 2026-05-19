@@ -113,9 +113,11 @@ export const submissionService = {
     const attachments = uploads.map((u) => u.attachment);
     const submittedAt = nowISO();
     const username = me.name.split(" ")[0].toLowerCase();
-    const status: Submission["status"] = isPastDeadline(type.deadlineTime, new Date(input.date))
-      ? "late"
-      : "submitted";
+    const pastDeadline = isPastDeadline(type.deadlineTime, new Date(input.date));
+    const isToday = input.date === todayISO();
+    // Past the workspace working-hours window for today → escalate to "late".
+    const pastWorkHours = isToday && workSettingsService.isPastWorkEnd();
+    const status: Submission["status"] = pastDeadline || pastWorkHours ? "late" : "submitted";
 
     const sub: Submission = {
       id: existing?.id ?? uid("sub"),
@@ -132,6 +134,8 @@ export const submissionService = {
       uploadedIp: pseudoIp(me.id + input.date),
       versionNumber: existing ? existing.versionNumber + 1 : 1,
       parentSubmissionId: existing?.id ?? null,
+      startedAt: existing?.startedAt ?? null,
+      taskTitle: existing?.taskTitle ?? null,
       filePath: attachments[0]
         ? buildSubmissionPath({
             username,
@@ -164,6 +168,8 @@ export const submissionService = {
       version_number: sub.versionNumber,
       parent_submission_id: sub.parentSubmissionId,
       file_path: sub.filePath,
+      started_at: sub.startedAt ?? null,
+      task_title: sub.taskTitle ?? null,
     };
 
     const { error: subErr } = await supabase
@@ -256,6 +262,85 @@ export const submissionService = {
         link: "/my-submissions",
       });
     }
+  },
+
+  /**
+   * Employee starts their workday: records `started_at` and an optional task title
+   * on the (potentially new) submission row for today. Idempotent — re-calling
+   * does NOT overwrite an existing startedAt.
+   */
+  async startDay(input: { date: string; submissionTypeId: string; taskTitle: string }) {
+    const me = useAuthStore.getState().user;
+    if (!me) throw new Error("Not authenticated");
+    const { submissions, setSubmissions, submissionTypes } = useDataStore.getState();
+    const type = submissionTypes.find((t) => t.id === input.submissionTypeId);
+    if (!type) throw new Error("Submission type not found");
+
+    const existing = submissions.find(
+      (s) => s.userId === me.id && s.date === input.date && s.submissionTypeId === type.id
+    );
+    if (existing?.startedAt) return existing; // already started
+
+    const startedAt = nowISO();
+    const sub: Submission = existing
+      ? { ...existing, startedAt, taskTitle: input.taskTitle.trim() || existing.taskTitle || null }
+      : {
+          id: uid("sub"),
+          userId: me.id,
+          submissionTypeId: type.id,
+          date: input.date,
+          workSummary: "",
+          tasksDetails: "",
+          attachments: [],
+          status: "pending",
+          locked: false,
+          submittedAt: null,
+          lockedAt: null,
+          uploadedIp: pseudoIp(me.id + input.date),
+          versionNumber: 1,
+          parentSubmissionId: null,
+          filePath: "",
+          startedAt,
+          taskTitle: input.taskTitle.trim() || null,
+        };
+
+    setSubmissions(existing ? submissions.map((s) => (s.id === sub.id ? sub : s)) : [sub, ...submissions]);
+
+    const { error } = await supabase
+      .from("submissions")
+      .upsert(
+        {
+          id: sub.id,
+          user_id: sub.userId,
+          submission_type_id: sub.submissionTypeId,
+          date: sub.date,
+          work_summary: sub.workSummary,
+          tasks_details: sub.tasksDetails,
+          status: sub.status,
+          locked: sub.locked,
+          submitted_at: sub.submittedAt,
+          locked_at: sub.lockedAt,
+          uploaded_ip: sub.uploadedIp,
+          version_number: sub.versionNumber,
+          parent_submission_id: sub.parentSubmissionId,
+          file_path: sub.filePath,
+          started_at: sub.startedAt,
+          task_title: sub.taskTitle,
+        },
+        { onConflict: "id" }
+      );
+    if (error) {
+      warn("startDay", error);
+      throw new Error("Failed to start day.");
+    }
+
+    logService.append({
+      userId: me.id,
+      action: "submission.start_day",
+      targetType: "submission",
+      targetId: sub.id,
+    });
+    return sub;
   },
 
   markStatus(id: string, status: Submission["status"]) {

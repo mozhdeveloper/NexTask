@@ -61,6 +61,8 @@ export interface Submission {
   versionNumber: number;
   parentSubmissionId: ID | null;
   filePath: string;
+  startedAt?: string | null; // when employee clicked "Start day / Start task"
+  taskTitle?: string | null; // optional headline shown to admins
 }
 
 export interface RevisionRequest {
@@ -136,6 +138,8 @@ export interface Holiday {
 export interface WorkSettings {
   workingDays: number[]; // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   holidays: Holiday[];
+  workStartTime: string; // "HH:mm" — earliest expected submission window
+  workEndTime: string;   // "HH:mm" — after this, missing submissions are marked
 }
 
 export interface AutoBackupSettings {

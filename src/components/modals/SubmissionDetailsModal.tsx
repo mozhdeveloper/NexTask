@@ -100,6 +100,10 @@ export function SubmissionDetailsModal({
             <div className="rounded-lg border border-surface-border bg-surface-subtle p-3 text-sm">
               <div className="grid grid-cols-2 gap-2">
                 <div>
+                  <div className="text-[11px] uppercase tracking-wide text-ink-muted">Started</div>
+                  <div>{submission.startedAt ? fmtTime(submission.startedAt) : "—"}</div>
+                </div>
+                <div>
                   <div className="text-[11px] uppercase tracking-wide text-ink-muted">Submitted</div>
                   <div>{fmtTime(submission.submittedAt)}</div>
                 </div>
@@ -120,6 +124,15 @@ export function SubmissionDetailsModal({
               </div>
             </div>
           </div>
+
+          {submission.taskTitle && (
+            <div>
+              <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-muted">Task</div>
+              <p className="rounded-lg border border-surface-border bg-white p-3 text-sm font-medium text-ink">
+                {submission.taskTitle}
+              </p>
+            </div>
+          )}
 
           <div>
             <div className="mb-1 text-[11px] uppercase tracking-wide text-ink-muted">Work summary</div>

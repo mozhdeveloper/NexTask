@@ -70,6 +70,8 @@ const initial = () => ({
   workSettings: {
     workingDays: [1, 2, 3, 4, 5], // Mon–Fri
     holidays: [] as WorkSettings["holidays"],
+    workStartTime: "09:00",
+    workEndTime: "18:00",
   } as WorkSettings,
   autoBackupSettings: {
     enabled: false,

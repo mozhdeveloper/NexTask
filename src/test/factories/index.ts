@@ -105,6 +105,8 @@ export const createProject = (overrides: Partial<Project> = {}): Project => ({
 export const createWorkSettings = (overrides: Partial<WorkSettings> = {}): WorkSettings => ({
   workingDays: [1, 2, 3, 4, 5], // Mon-Fri
   holidays: [],
+  workStartTime: "09:00",
+  workEndTime: "18:00",
   ...overrides,
 });
 

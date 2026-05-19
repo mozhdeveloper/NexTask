@@ -67,6 +67,8 @@ export interface DbSubmissionRow {
   parent_submission_id: string | null;
   file_path: string;
   created_at: string;
+  started_at: string | null;
+  task_title: string | null;
 }
 
 export interface DbAttachmentRow {
@@ -155,6 +157,8 @@ export interface DbWorkSettingsRow {
   auto_backup_time: string;
   last_auto_backup_date: string | null;
   updated_at: string;
+  work_start_time: string;
+  work_end_time: string;
 }
 
 export interface DbHolidayRow {

@@ -16,7 +16,7 @@ import { workSettingsService } from "@/services/workSettings.service";
 import { toast } from "sonner";
 import {
   Trash2, Plus, Pencil, X, Check, CalendarDays, HardDrive,
-  Palette, AlertTriangle, Download, Globe, CalendarCheck,
+  Palette, AlertTriangle, Download, Globe, CalendarCheck, Clock, Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Holiday } from "@/types";
@@ -271,6 +271,13 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Working Hours ── */}
+      {isAdminOrManager && <WorkingHoursCard />}
+
+      {/* ── Departments ── */}
+      {user?.role === "admin" && <DepartmentsCard />}
+
 
       {/* ── Auto Backup ── */}
       {isAdminOrManager && (
@@ -724,6 +731,194 @@ function PushNotificationsCard() {
             </Button>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+// -- Working Hours card ------------------------------------------------
+function WorkingHoursCard() {
+  const workSettings = useDataStore((s) => s.workSettings);
+  const [start, setStart] = useState(workSettings.workStartTime ?? "09:00");
+  const [end, setEnd] = useState(workSettings.workEndTime ?? "18:00");
+  const dirty = start !== workSettings.workStartTime || end !== workSettings.workEndTime;
+
+  const save = () => {
+    if (!start || !end) return toast.error("Both start and end times are required.");
+    if (start >= end) return toast.error("Start time must be earlier than end time.");
+    workSettingsService.setWorkHours(start, end);
+    toast.success("Working hours updated.");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <SectionIcon icon={Clock} className="bg-indigo-50 text-indigo-600" />
+          <div>
+            <CardTitle>Working Hours</CardTitle>
+            <CardDescription>
+              Daily work window. Submissions filed after the end time are flagged as late,
+              and employees who don&apos;t submit on a working day are marked missing.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Start time</Label>
+            <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>End time</Label>
+            <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+        </div>
+        <div className="mt-4 flex items-center justify-between rounded-lg bg-surface-subtle px-3 py-2 text-xs text-ink-muted">
+          <span>Current window: <span className="font-semibold text-ink">{workSettings.workStartTime ?? "09:00"} � {workSettings.workEndTime ?? "18:00"}</span></span>
+          <Button size="sm" disabled={!dirty} onClick={save}>Save</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// -- Departments card --------------------------------------------------
+function DepartmentsCard() {
+  const departments = useDataStore((s) => s.departments);
+  const users = useDataStore((s) => s.users);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [editing, setEditing] = useState<{ id: string; name: string; description: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+
+  const memberCount = (depId: string) => users.filter((u) => u.departmentId === depId).length;
+
+  const create = async () => {
+    if (!name.trim()) return toast.error("Department name is required.");
+    setBusy(true);
+    try {
+      const { departmentService } = await import("@/services/department.service");
+      await departmentService.create({ name, description });
+      toast.success("Department created.");
+      setName("");
+      setDescription("");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editing.name.trim()) return toast.error("Name is required.");
+    setBusy(true);
+    try {
+      const { departmentService } = await import("@/services/department.service");
+      await departmentService.update(editing.id, { name: editing.name, description: editing.description });
+      toast.success("Department updated.");
+      setEditing(null);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      const { departmentService } = await import("@/services/department.service");
+      await departmentService.remove(id);
+      toast.success("Department deleted.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+      setConfirmDelete(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <SectionIcon icon={Building2} className="bg-teal-50 text-teal-600" />
+          <div>
+            <CardTitle>Departments</CardTitle>
+            <CardDescription>
+              Create and manage the departments that group employees and submission types.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="rounded-lg border border-dashed border-surface-border bg-surface-subtle p-4">
+          <p className="mb-3 text-sm font-medium text-ink">Add new department</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1.5">
+              <Label>Name</Label>
+              <Input placeholder="e.g. Engineering" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="flex-[2] space-y-1.5">
+              <Label>Description (optional)</Label>
+              <Input placeholder="What does this team do?" value={description} onChange={(e) => setDescription(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
+            </div>
+            <Button onClick={create} disabled={busy} className="gap-1.5 sm:flex-shrink-0">
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
+        </div>
+
+        {departments.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-surface-border py-8 text-center text-sm text-ink-muted">
+            No departments yet. Add one above.
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {departments.map((d) =>
+              editing?.id === d.id ? (
+                <li key={d.id} className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary-soft p-2 sm:flex-row sm:items-center">
+                  <Input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} className="h-8 flex-1" autoFocus />
+                  <Input value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} placeholder="Description" className="h-8 flex-[2]" />
+                  <div className="flex items-center gap-1">
+                    <button onClick={saveEdit} disabled={busy} className="rounded p-1 text-success hover:bg-success-soft"><Check className="h-4 w-4" /></button>
+                    <button onClick={() => setEditing(null)} className="rounded p-1 text-ink-muted hover:bg-surface-border"><X className="h-4 w-4" /></button>
+                  </div>
+                </li>
+              ) : (
+                <li key={d.id} className="group flex items-center justify-between rounded-lg border border-surface-border bg-white px-3 py-2.5 text-sm hover:border-primary/20">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-ink">{d.name}</p>
+                    <p className="truncate text-xs text-ink-muted">{d.description ?? `${memberCount(d.id)} member${memberCount(d.id) !== 1 ? "s" : ""}`}</p>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button onClick={() => setEditing({ id: d.id, name: d.name, description: d.description ?? "" })} className="rounded p-1 text-ink-muted hover:text-primary">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setConfirmDelete({ id: d.id, name: d.name })} className="rounded p-1 text-ink-muted hover:text-danger">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              )
+            )}
+          </ul>
+        )}
+
+        <ConfirmModal
+          open={!!confirmDelete}
+          onOpenChange={(v) => !v && setConfirmDelete(null)}
+          title={`Delete department "${confirmDelete?.name}"?`}
+          description="This cannot be undone. Departments with assigned employees cannot be deleted � reassign them first."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => { if (confirmDelete) void remove(confirmDelete.id); }}
+        />
       </CardContent>
     </Card>
   );
