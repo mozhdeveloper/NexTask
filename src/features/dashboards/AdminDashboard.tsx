@@ -32,6 +32,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { reportService } from "@/services/report.service";
 import { workSettingsService } from "@/services/workSettings.service";
+import { complianceService } from "@/services/compliance.service";
 
 export default function AdminDashboard() {
   const users = useDataStore((s) => s.users);
@@ -44,9 +45,13 @@ export default function AdminDashboard() {
   const today = todayISO();
   const employees = users.filter((u) => u.isActive && (u.role === "employee" || u.role === "manager"));
   const todays = submissions.filter((s) => s.date === today);
-  const submittedToday = todays.filter((s) => s.status !== "missing" && s.status !== "pending").length;
-  const pendingToday = todays.filter((s) => s.status === "pending" || s.status === "missing").length;
-  const overdue = todays.filter((s) => (s.status === "late" || s.status === "missing") && workSettingsService.isWorkingDay(s.date)).length;
+  // Compliance counts include virtual "missing" rows for employees with no submission.
+  const counts = complianceService.dayCounts(today);
+  const submittedToday = counts.submitted;
+  const pendingToday = counts.pending;
+  const missingToday = counts.missing;
+  const lateToday = counts.late;
+  const overdue = lateToday + missingToday;
   const revisions = useDataStore((s) => s.revisions);
   const pendingRevisions = revisions.filter((r) => r.status === "pending").length;
 
@@ -80,9 +85,10 @@ export default function AdminDashboard() {
   const donutData = [
     { name: "Submitted", value: submittedToday, color: "#66B2B2" },
     { name: "Pending", value: pendingToday, color: "#F59E0B" },
-    { name: "Overdue", value: overdue, color: "#EF4444" },
+    { name: "Late", value: lateToday, color: "#F97316" },
+    { name: "Missing", value: missingToday, color: "#EF4444" },
   ];
-  const totalExpected = employees.length;
+  const totalExpected = counts.expected || employees.length;
 
   const recent = [...submissions]
     .filter((s) => s.locked)
@@ -98,11 +104,12 @@ export default function AdminDashboard() {
     return { ...d, submitted, expected, pct: expected ? Math.round((submitted / expected) * 100) : 0 };
   });
 
-  const overdueRows = todays
-    .filter((s) => (s.status === "late" || s.status === "missing") && workSettingsService.isWorkingDay(s.date))
+  const overdueCells = complianceService
+    .dayOverview(today)
+    .filter((c) => c.effectiveStatus === "late" || c.effectiveStatus === "missing")
     .slice(0, 5);
 
-  const sendReminders = () => toast.success(`Reminders sent to ${overdueRows.length} employee(s).`);
+  const sendReminders = () => toast.success(`Reminders sent to ${overdueCells.length} employee(s).`);
   const downloadReport = () => {
     reportService.export("daily", "csv");
     toast.success("Daily report downloaded.");
@@ -123,10 +130,10 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard icon={Users} label="Total Employees" value={employees.length} sublabel="active" tint="indigo" />
-        <StatCard icon={ClipboardList} label="Today's Submissions" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
-        <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="awaiting" tint="amber" />
-        <StatCard icon={CalendarCheck2} label="This Week" value={`${weekSubmissions}/${weekWorkingDays * employees.length}`} sublabel="compliance" tint="violet" />
-        <StatCard icon={AlertTriangle} label="Overdue" value={overdue} sublabel="late/missing" tint="rose" />
+        <StatCard icon={ClipboardList} label="Submitted Today" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
+        <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="on-track" tint="amber" />
+        <StatCard icon={AlertTriangle} label="Late" value={lateToday} sublabel="past deadline" tint="rose" />
+        <StatCard icon={AlertTriangle} label="Missing" value={missingToday} sublabel="no submission" tint="rose" />
         <StatCard icon={Bell} label="Revision Requests" value={pendingRevisions} sublabel="pending" tint="amber" />
       </div>
 
@@ -224,25 +231,26 @@ export default function AdminDashboard() {
           <Button size="sm" onClick={sendReminders}><Bell className="h-4 w-4" /> Send reminders</Button>
         </CardHeader>
         <CardContent>
-          {overdueRows.length === 0 ? (
+          {overdueCells.length === 0 ? (
             <div className="py-8 text-center text-sm text-ink-muted">No overdue submissions today 🎉</div>
           ) : (            <div className="overflow-x-auto -mx-2 px-2">            <Table>
               <THead><TR><TH>Employee</TH><TH>Department</TH><TH>Due</TH><TH>Status</TH></TR></THead>
               <TBody>
-                {overdueRows.map((s) => {
-                  const u = users.find((x) => x.id === s.userId);
-                  const dept = departments.find((x) => x.id === u?.departmentId);
+                {overdueCells.map((c) => {
+                  const u = c.user;
+                  const dept = departments.find((x) => x.id === u.departmentId);
+                  const status = c.effectiveStatus!;
                   return (
-                    <TR key={s.id}>
+                    <TR key={u.id + today}>
                       <TD>
                         <div className="flex items-center gap-2">
-                          {u && <Avatar className="h-7 w-7"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>}
-                          <span>{u?.name}</span>
+                          <Avatar className="h-7 w-7"><AvatarFallback className={u.avatarColor}>{initials(u.name)}</AvatarFallback></Avatar>
+                          <span>{u.name}</span>
                         </div>
                       </TD>
                       <TD>{dept?.name}</TD>
-                      <TD>{fmtDate(s.date)}</TD>
-                      <TD><StatusPill status={s.status} /></TD>
+                      <TD>{fmtDate(today)}</TD>
+                      <TD><StatusPill status={status} /></TD>
                     </TR>
                   );
                 })}

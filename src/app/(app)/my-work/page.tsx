@@ -15,7 +15,7 @@ import { useSearchParams } from "next/navigation";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import { submissionService } from "@/services/submission.service";
 import { toast } from "sonner";
-import { Play, CheckCircle2, Clock3 } from "lucide-react";
+import { Play, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
 import type { Submission } from "@/types";
 
 export default function MyWorkPage() {
@@ -44,6 +44,7 @@ export default function MyWorkPage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [typeId, setTypeId] = useState("");
   const [starting, setStarting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   if (!ready || !user) return null;
 
@@ -70,6 +71,19 @@ export default function MyWorkPage() {
       toast.error((e as Error).message);
     } finally {
       setStarting(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!confirm("Reset today's workday? This clears your started time and task title. Any draft summary is preserved.")) return;
+    setResetting(true);
+    try {
+      await submissionService.resetDay(targetDate);
+      toast.success("Day reset — you can start over.");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -103,14 +117,27 @@ export default function MyWorkPage() {
               </CardDescription>
             </div>
             {started && (
-              <span
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                  finished ? "bg-success-soft text-success" : "bg-amber-50 text-amber-700"
-                }`}
-              >
-                {finished ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
-                {finished ? "Finished" : "In progress"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
+                    finished ? "bg-success-soft text-success" : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {finished ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
+                  {finished ? "Finished" : "In progress"}
+                </span>
+                {!finished && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReset}
+                    disabled={resetting}
+                    className="gap-1.5"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> Reset day
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </CardHeader>

@@ -14,7 +14,7 @@ import { fmtDate } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RevisionDecisionModal } from "@/components/modals/RevisionDecisionModal";
-import { useRequireRole } from "@/hooks/useAuth";
+import { useRequireRole, useAuth } from "@/hooks/useAuth";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
@@ -67,9 +67,20 @@ type Tab = keyof typeof TAB_CONFIG;
 
 export default function RevisionsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
-  const revisions = useDataStore((s) => s.revisions);
+  const me = useAuth();
+  const scopeDeptId = me?.role === "manager" ? me?.departmentId ?? null : null;
+  const allRevisions = useDataStore((s) => s.revisions);
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
+  // Restrict revisions to those belonging to users in the manager's department.
+  const revisions = useMemo(() => {
+    if (!scopeDeptId) return allRevisions;
+    return allRevisions.filter((r) => {
+      const sub = submissions.find((s) => s.id === r.submissionId);
+      const owner = users.find((u) => u.id === sub?.userId);
+      return owner?.departmentId === scopeDeptId;
+    });
+  }, [allRevisions, submissions, users, scopeDeptId]);
   const [decision, setDecision] = useState<{ id: string; mode: "approve" | "reject" } | null>(null);
   const [tab, setTab] = useState<Tab>("pending");
   const [q, setQ] = useState("");

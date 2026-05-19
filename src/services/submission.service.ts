@@ -343,11 +343,60 @@ export const submissionService = {
     return sub;
   },
 
+  /**
+   * Cancels an in-progress day: clears startedAt + taskTitle on a not-yet-submitted
+   * row. If the row has no workSummary/attachments/submittedAt, the row is deleted
+   * outright. No-op if the submission is already locked/submitted.
+   */
+  async resetDay(date: string) {
+    const me = useAuthStore.getState().user;
+    if (!me) throw new Error("Not authenticated");
+    const { submissions, setSubmissions } = useDataStore.getState();
+    const existing = submissions.find((s) => s.userId === me.id && s.date === date);
+    if (!existing) return;
+    if (existing.locked || existing.submittedAt) {
+      throw new Error("This day is already submitted and locked. Request a revision instead.");
+    }
+
+    const hasContent =
+      (existing.workSummary?.trim().length ?? 0) > 0 ||
+      (existing.tasksDetails?.trim().length ?? 0) > 0 ||
+      existing.attachments.length > 0;
+
+    if (!hasContent) {
+      setSubmissions(submissions.filter((s) => s.id !== existing.id));
+      const { error } = await supabase.from("submissions").delete().eq("id", existing.id);
+      if (error) warn("resetDay.delete", error);
+    } else {
+      const next = { ...existing, startedAt: null, taskTitle: null };
+      setSubmissions(submissions.map((s) => (s.id === existing.id ? next : s)));
+      const { error } = await supabase
+        .from("submissions")
+        .update({ started_at: null, task_title: null })
+        .eq("id", existing.id);
+      if (error) warn("resetDay.update", error);
+    }
+
+    logService.append({
+      userId: me.id,
+      action: "submission.reset_day",
+      targetType: "submission",
+      targetId: existing.id,
+    });
+  },
+
   markStatus(id: string, status: Submission["status"]) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
-    const { submissions, setSubmissions } = useDataStore.getState();
+    const { submissions, setSubmissions, users } = useDataStore.getState();
     const prev = submissions.find((s) => s.id === id);
+    // Managers may only override submissions belonging to users in their own department.
+    if (me.role === "manager" && prev) {
+      const owner = users.find((u) => u.id === prev.userId);
+      if (!owner || owner.departmentId !== me.departmentId) {
+        throw new Error("Managers can only update submissions in their own department.");
+      }
+    }
     setSubmissions(submissions.map((s) => (s.id === id ? { ...s, status } : s)));
     supabase
       .from("submissions")

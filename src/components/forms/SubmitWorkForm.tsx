@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -59,6 +59,15 @@ export function SubmitWorkForm({
     ? submissionService.forUserOnDate(user.id, today)
     : null;
 
+  // Force the submission type to match the type chosen when the day was started.
+  // The user cannot switch types mid-day without resetting the day from /my-work.
+  useEffect(() => {
+    if (existing?.startedAt && existing.submissionTypeId && existing.submissionTypeId !== selectedTypeId) {
+      setSelectedTypeId(existing.submissionTypeId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existing?.startedAt, existing?.submissionTypeId]);
+
   const {
     register,
     handleSubmit,
@@ -74,6 +83,9 @@ export function SubmitWorkForm({
   });
 
   const locked = !!existing?.locked;
+  // The submission type cannot be changed once the day has been started — the
+  // user must explicitly "Reset day" from /my-work to pick a different type.
+  const typeLocked = locked || !!existing?.startedAt;
 
   // Client-side file validation using the selected type's rules
   const addFiles = (incoming: File[]) => {
@@ -151,6 +163,17 @@ export function SubmitWorkForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      {/* In-progress banner — shown when the day has been started but not yet submitted */}
+      {existing?.startedAt && !existing.submittedAt && (
+        <div className="rounded-lg border border-primary/30 bg-primary-soft/30 px-3 py-2 text-xs text-ink">
+          <div className="font-medium text-ink">Day in progress</div>
+          <div className="mt-0.5 text-ink-muted">
+            Started {new Date(existing.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {existing.taskTitle ? <> · Task: <span className="font-medium text-ink">{existing.taskTitle}</span></> : null}
+          </div>
+        </div>
+      )}
+
       {/* Submission Type */}
       {availableTypes.length > 1 && (
         <div className="space-y-1.5">
@@ -161,7 +184,7 @@ export function SubmitWorkForm({
               setSelectedTypeId(v);
               setFiles([]); // clear files when type changes since rules differ
             }}
-            disabled={locked}
+            disabled={typeLocked}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select type" />

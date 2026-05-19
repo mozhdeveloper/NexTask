@@ -173,7 +173,15 @@ export default function CalendarPage() {
   if (!user) return null;
 
   const canSelect = user.role === "admin" || user.role === "manager";
-  const effectiveId = canSelect && viewUserId ? viewUserId : user.id;
+  // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
+  const pickedUserInScope = (() => {
+    if (!viewUserId) return false;
+    const target = users.find((u) => u.id === viewUserId);
+    if (!target) return false;
+    if (user.role === "manager" && target.departmentId !== user.departmentId) return false;
+    return true;
+  })();
+  const effectiveId = canSelect && pickedUserInScope ? viewUserId! : user.id;
   const effectiveUser = users.find((u) => u.id === effectiveId) ?? user;
   const isSelf = effectiveId === user.id;
   const today = new Date();
@@ -246,6 +254,8 @@ export default function CalendarPage() {
                 <SelectItem value={user.id}>My calendar</SelectItem>
                 {users
                   .filter((u) => u.isActive && u.id !== user.id)
+                  // Managers may only browse calendars within their own department.
+                  .filter((u) => user.role !== "manager" || u.departmentId === user.departmentId)
                   .map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
             </Select>

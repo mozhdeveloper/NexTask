@@ -100,6 +100,12 @@ export function EmployeeFormModal({
   };
 
   const submit = async (v: V) => {
+    // Defensive: make sure the chosen department still exists in the store
+    // (it could have been deleted in another tab between mount and submit).
+    if (!departments.some((d) => d.id === v.departmentId)) {
+      toast.error("Selected department no longer exists. Please pick another.");
+      return;
+    }
     setBusy(true);
     try {
       if (editing) {

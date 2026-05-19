@@ -24,7 +24,7 @@ import { userService } from "@/services/user.service";
 import { toast } from "sonner";
 import type { User } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useRequireRole } from "@/hooks/useAuth";
+import { useRequireRole, useAuth } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -61,8 +61,15 @@ function StatCard({
 
 export default function EmployeesPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
+  const me = useAuth();
+  const isManager = me?.role === "manager";
+  const scopeDeptId = isManager ? me?.departmentId ?? null : null;
   const canManage = usePermission("manage_employees");
-  const users = useDataStore((s) => s.users);
+  const allUsers = useDataStore((s) => s.users);
+  const users = useMemo(
+    () => (scopeDeptId ? allUsers.filter((u) => u.departmentId === scopeDeptId) : allUsers),
+    [allUsers, scopeDeptId],
+  );
   const departments = useDataStore((s) => s.departments);
   const [q, setQ] = useState("");
   const [dept, setDept] = useState("all");
@@ -105,8 +112,12 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Employees"
-        description="Manage your team members, roles, and workspace access."
+        title={isManager ? "My Team" : "Employees"}
+        description={
+          isManager
+            ? "Manage the members of your department."
+            : "Manage your team members, roles, and workspace access."
+        }
         actions={
           canManage ? (
             <Button onClick={() => { setEditing(null); setOpen(true); }}>

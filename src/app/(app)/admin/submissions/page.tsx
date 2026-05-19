@@ -18,7 +18,7 @@ import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { submissionService } from "@/services/submission.service";
 import { workSettingsService } from "@/services/workSettings.service";
 import { downloadBlob, toCsv } from "@/lib/helpers";
-import { useRequireRole } from "@/hooks/useAuth";
+import { useRequireRole, useAuth } from "@/hooks/useAuth";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 import { toast } from "sonner";
@@ -30,6 +30,9 @@ const PAGE_SIZE = 20;
 
 export default function AdminSubmissionsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
+  const me = useAuth();
+  const isManager = me?.role === "manager";
+  const scopeDeptId = isManager ? me?.departmentId ?? null : null;
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
@@ -48,6 +51,12 @@ export default function AdminSubmissionsPage() {
 
   const rows = useMemo(() => {
     return submissions
+      .filter((s) => {
+        // Manager scope: only see submissions from users in their own department.
+        if (!scopeDeptId) return true;
+        const u = users.find((x) => x.id === s.userId);
+        return u?.departmentId === scopeDeptId;
+      })
       .filter((s) => (status === "all" ? true : s.status === status))
       .filter((s) => (date ? s.date === date : true))
       .filter((s) => {
@@ -61,7 +70,7 @@ export default function AdminSubmissionsPage() {
         return ((u?.name ?? "") + (u?.email ?? "") + s.workSummary).toLowerCase().includes(q.toLowerCase());
       })
       .sort((a, b) => (b.submittedAt ?? "").localeCompare(a.submittedAt ?? ""));
-  }, [submissions, users, status, dept, q, date]);
+  }, [submissions, users, status, dept, q, date, scopeDeptId]);
 
   // Reset to page 1 whenever filters change
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
@@ -83,8 +92,12 @@ export default function AdminSubmissionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="All Submissions"
-        description="Filter, review, and act on every submission across the office."
+        title={isManager ? "Team Submissions" : "All Submissions"}
+        description={
+          isManager
+            ? "Review and act on submissions from your department."
+            : "Filter, review, and act on every submission across the office."
+        }
         actions={<Button variant="outline" onClick={exportCsv}><Download className="h-4 w-4" /> Export</Button>}
       />
       <Card>

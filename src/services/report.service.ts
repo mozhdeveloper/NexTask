@@ -1,8 +1,9 @@
 import { useDataStore } from "@/store/dataStore";
 import { downloadBlob, toCsv } from "@/lib/helpers";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, todayISO } from "@/lib/dates";
 import { logService } from "./log.service";
 import { useAuthStore } from "@/store/authStore";
+import { workSettingsService } from "./workSettings.service";
 
 export type ReportType =
   | "daily"
@@ -45,18 +46,45 @@ function rowsFor(type: ReportType) {
             SubmittedAt: s.submittedAt ?? "",
           };
         });
-    case "missing":
-      return submissions
-        .filter((s) => s.status === "missing" || s.status === "pending")
+    case "missing": {
+      // Include real "missing" rows AND virtual no-shows (active employees with
+      // no submission row on a past working day) for the last 30 days.
+      const end = todayISO();
+      const startD = new Date(end);
+      startD.setDate(startD.getDate() - 30);
+
+      const realRows = submissions
+        .filter((s) => s.status === "missing")
         .map((s) => {
           const u = userById(s.userId);
           return {
             Date: s.date,
             Employee: u?.name ?? "—",
             Department: deptById(u?.departmentId ?? null),
-            Status: s.status,
+            Status: "missing",
           };
         });
+
+      const virtual: { Date: string; Employee: string; Department: string; Status: string }[] = [];
+      const activeWorkers = users.filter(
+        (u) => u.isActive && (u.role === "employee" || u.role === "manager"),
+      );
+      for (let d = new Date(startD); d.toISOString().slice(0, 10) <= end; d.setDate(d.getDate() + 1)) {
+        const iso = d.toISOString().slice(0, 10);
+        if (!workSettingsService.isWorkingDay(iso)) continue;
+        for (const u of activeWorkers) {
+          if (submissions.some((s) => s.userId === u.id && s.date === iso)) continue;
+          if (iso === end && !workSettingsService.isPastWorkEnd()) continue;
+          virtual.push({
+            Date: iso,
+            Employee: u.name,
+            Department: deptById(u.departmentId ?? null),
+            Status: "missing (no submission)",
+          });
+        }
+      }
+      return [...realRows, ...virtual].sort((a, b) => b.Date.localeCompare(a.Date));
+    }
     case "employee_compliance": {
       const grouped = new Map<string, { total: number; ok: number }>();
       submissions.forEach((s) => {
