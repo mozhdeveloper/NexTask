@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { StatusPill } from "@/components/ui/status-pill";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import { STATUS_META } from "@/lib/status";
+import { workSettingsService } from "@/services/workSettings.service";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 
@@ -86,16 +87,24 @@ function DayCell({
   compact?: boolean;
   onSelect: (d: Date, sub?: Submission) => void;
 }) {
+  const iso = format(d, "yyyy-MM-dd");
+  const holiday = workSettingsService.isHoliday(iso);
+  const nonWorking = !workSettingsService.isWorkingDay(iso);
   return (
     <button
       onClick={() => onSelect(d, sub)}
+      title={holiday ? "Holiday" : nonWorking ? "Non-working day" : undefined}
       className={cn(
         "group relative flex flex-col rounded-lg border text-left transition-all",
         compact ? "min-h-[44px] p-1.5 sm:min-h-[68px] sm:p-2" : "min-h-[96px] p-3",
         inMonth
           ? isPicked
             ? "border-primary bg-primary-soft/30 shadow-sm"
-            : "border-surface-border bg-white hover:border-primary/40 hover:shadow-sm"
+            : holiday
+              ? "border-rose-200 bg-rose-50/60 hover:border-rose-300"
+              : nonWorking
+                ? "border-surface-border bg-surface-subtle/70 hover:border-ink/20"
+                : "border-surface-border bg-white hover:border-primary/40 hover:shadow-sm"
           : "border-transparent bg-surface-subtle/60",
         isToday && !isPicked && "ring-2 ring-primary ring-offset-1"
       )}
@@ -137,6 +146,18 @@ function DayCell({
         <p className="mt-1.5 line-clamp-2 text-[10px] leading-relaxed text-ink-muted">
           {sub.workSummary}
         </p>
+      )}
+
+      {/* Holiday / non-working badge (full cells, no submission) */}
+      {!sub && inMonth && holiday && !compact && (
+        <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+          Holiday
+        </span>
+      )}
+      {!sub && inMonth && !holiday && nonWorking && !compact && (
+        <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-surface-border bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">
+          Off day
+        </span>
       )}
     </button>
   );

@@ -59,8 +59,20 @@ export default function ProjectsPage() {
   const users = useDataStore((s) => s.users);
 
   // Managers only see projects that involve their department's employees.
+  // Employees only see projects they are assigned to (owner / member) or that
+  // target their own department.
   const projects = useMemo(() => {
-    if (me?.role !== "manager" || !me.departmentId) return allProjects;
+    if (!me) return [];
+    if (me.role === "employee") {
+      return allProjects.filter(
+        (p) =>
+          p.ownerId === me.id ||
+          p.lead === me.id ||
+          (p.members ?? []).includes(me.id) ||
+          (!!me.departmentId && p.departmentId === me.departmentId)
+      );
+    }
+    if (me.role !== "manager" || !me.departmentId) return allProjects;
     const deptIds = new Set(users.filter((u) => u.departmentId === me.departmentId).map((u) => u.id));
     return allProjects.filter(
       (p) =>
@@ -69,7 +81,7 @@ export default function ProjectsPage() {
         (p.lead != null && deptIds.has(p.lead)) ||
         (p.members ?? []).some((mid) => deptIds.has(mid))
     );
-  }, [allProjects, me?.role, me?.departmentId, users]);
+  }, [allProjects, me, users]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [details, setDetails] = useState<Project | null>(null);

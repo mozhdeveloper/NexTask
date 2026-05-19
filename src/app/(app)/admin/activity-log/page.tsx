@@ -5,7 +5,7 @@ import {
   UserPlus, UserCog, Users, FolderPlus, Folder, FolderMinus,
   Settings, HardDrive, FileDown, AlertTriangle, RefreshCw,
   Download, Search, Activity, ShieldCheck, CalendarOff, CalendarPlus,
-  ClipboardCheck, Pencil, Bell,
+  ClipboardCheck, Pencil, Bell, RotateCcw, Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -45,6 +45,9 @@ const ACTION_META: Record<string, ActionMeta> = {
   "submission.upload":            { label: "Submitted daily work",    Icon: Upload,         bg: "bg-blue-100",    text: "text-blue-600",    badgeVariant: "info",     group: "submission" },
   "submission.unlock":            { label: "Unlocked submission",     Icon: Unlock,         bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "submission" },
   "submission.mark_status":       { label: "Updated submission status", Icon: ClipboardCheck, bg: "bg-blue-100", text: "text-blue-600",    badgeVariant: "info",     group: "submission" },
+  "submission.start_day":         { label: "Started workday",         Icon: ClipboardCheck, bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "submission" },
+  "submission.reset_day":         { label: "Reset workday",           Icon: RotateCcw,      bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "submission" },
+  "submission.force_reset":       { label: "Force-reset submission",  Icon: Trash2,         bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "submission" },
   "revision.request":             { label: "Requested revision",      Icon: Pencil,         bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "revision" },
   "revision.approve":             { label: "Approved revision",       Icon: CheckCircle2,   bg: "bg-emerald-100", text: "text-emerald-600", badgeVariant: "success",  group: "revision" },
   "revision.reject":              { label: "Rejected revision",       Icon: XCircle,        bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "revision" },

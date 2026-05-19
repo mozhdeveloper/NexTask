@@ -15,7 +15,9 @@ import { useSearchParams } from "next/navigation";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import { submissionService } from "@/services/submission.service";
 import { toast } from "sonner";
-import { Play, CheckCircle2, Clock3, RotateCcw } from "lucide-react";
+import { Play, CheckCircle2, Clock3, RotateCcw, Lock, Pencil, AlertCircle } from "lucide-react";
+import { workSettingsService } from "@/services/workSettings.service";
+import { RevisionRequestModal } from "@/components/modals/RevisionRequestModal";
 import type { Submission } from "@/types";
 
 export default function MyWorkPage() {
@@ -45,6 +47,7 @@ export default function MyWorkPage() {
   const [typeId, setTypeId] = useState("");
   const [starting, setStarting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [revOpen, setRevOpen] = useState(false);
 
   if (!ready || !user) return null;
 
@@ -57,6 +60,14 @@ export default function MyWorkPage() {
 
   const started = !!todaySub?.startedAt;
   const finished = !!todaySub?.submittedAt;
+
+  // Past end-of-work today with nothing submitted → considered missing for preview.
+  const isMissingToday =
+    targetDate === today &&
+    !todaySub &&
+    workSettingsService.isWorkingDay(today) &&
+    !workSettingsService.isHoliday(today) &&
+    workSettingsService.isPastWorkEnd();
 
   const handleStart = async () => {
     const tid = typeId || availableTypes[0]?.id;
@@ -75,10 +86,15 @@ export default function MyWorkPage() {
   };
 
   const handleReset = async () => {
-    if (!confirm("Reset today's workday? This clears your started time and task title. Any draft summary is preserved.")) return;
+    const isLocked = !!todaySub?.locked;
+    const msg = isLocked
+      ? "This will permanently delete your submitted work for this day (including attachments). Continue?"
+      : "Reset today's workday? This clears your started time and task title.";
+    if (!confirm(msg)) return;
     setResetting(true);
     try {
-      await submissionService.resetDay(targetDate);
+      if (isLocked) await submissionService.forceResetDay(targetDate);
+      else await submissionService.resetDay(targetDate);
       toast.success("Day reset — you can start over.");
     } catch (e) {
       toast.error((e as Error).message);
@@ -126,13 +142,14 @@ export default function MyWorkPage() {
                   {finished ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock3 className="h-3.5 w-3.5" />}
                   {finished ? "Finished" : "In progress"}
                 </span>
-                {!finished && (
+                {(started || finished) && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleReset}
                     disabled={resetting}
                     className="gap-1.5"
+                    title={finished ? "Wipe today's submission (for testing)" : "Reset day"}
                   >
                     <RotateCcw className="h-3.5 w-3.5" /> Reset day
                   </Button>
@@ -230,17 +247,68 @@ export default function MyWorkPage() {
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>
-              {finished ? "Update your submission" : started ? "Finish & submit" : "Submission form"}
+              {finished && todaySub?.locked
+                ? "Submission locked"
+                : started
+                  ? "Finish & submit"
+                  : "Submission form"}
             </CardTitle>
             <CardDescription>
-              {started || finished
-                ? "Add a summary, attach any deliverables, then submit to mark today complete."
-                : "Start your day first to unlock the submission form."}
+              {finished && todaySub?.locked
+                ? "Your work is in. To make any changes, request a revision and wait for approval."
+                : started
+                  ? "Add a summary, attach any deliverables, then submit to mark today complete."
+                  : "Start your day first to unlock the submission form."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {started || finished ? (
+            {finished && todaySub?.locked ? (
+              <div className="space-y-4">
+                <div className="rounded-lg border border-success/30 bg-success-soft/40 px-4 py-3">
+                  <div className="flex items-start gap-2.5">
+                    <Lock className="mt-0.5 h-4 w-4 flex-shrink-0 text-success" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-ink">Submitted at {fmtTime(todaySub.submittedAt)}</p>
+                      {todaySub.workSummary && (
+                        <p className="mt-1 line-clamp-2 text-sm text-ink-muted">{todaySub.workSummary}</p>
+                      )}
+                      <p className="mt-2 text-xs text-ink-muted">
+                        Status: <StatusPill status={todaySub.status} />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setSelected(todaySub); setOpen(true); }}>
+                    View details
+                  </Button>
+                  {!["revision_requested", "revision_rejected"].includes(todaySub.status) && (
+                    <Button size="sm" onClick={() => setRevOpen(true)} className="gap-1.5">
+                      <Pencil className="h-3.5 w-3.5" /> Request revision
+                    </Button>
+                  )}
+                  {todaySub.status === "revision_requested" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                      <Clock3 className="h-3 w-3" /> Awaiting admin/manager approval
+                    </span>
+                  )}
+                  {todaySub.status === "revision_rejected" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">
+                      <AlertCircle className="h-3 w-3" /> Revision rejected
+                    </span>
+                  )}
+                </div>
+              </div>
+            ) : started || finished ? (
               <SubmitWorkForm defaultDate={targetDate} />
+            ) : isMissingToday ? (
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/60 px-4 py-10 text-center">
+                <AlertCircle className="h-8 w-8 text-rose-500" />
+                <p className="text-sm font-semibold text-rose-700">Marked as missing</p>
+                <p className="max-w-sm text-xs text-ink-muted">
+                  You did not submit today's work before the end of the working day. This date will appear as <span className="font-medium text-rose-600">missing</span> on your record.
+                </p>
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-2 py-12 text-center text-ink-muted">
                 <Clock3 className="h-8 w-8 opacity-40" />
@@ -287,6 +355,13 @@ export default function MyWorkPage() {
         </Card>
       </div>
       <SubmissionDetailsModal open={open} onOpenChange={setOpen} submission={selected} />
+      {todaySub && (
+        <RevisionRequestModal
+          open={revOpen}
+          onOpenChange={setRevOpen}
+          submissionId={todaySub.id}
+        />
+      )}
     </div>
   );
 }

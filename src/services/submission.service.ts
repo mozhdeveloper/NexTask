@@ -386,6 +386,57 @@ export const submissionService = {
     });
   },
 
+  /**
+   * Force-reset the current user's submission for the given date — fully deletes
+   * the row, its attachments, and storage files. Intended for self-service testing
+   * and recovery. Allowed even when the submission is locked/submitted, because the
+   * employee is wiping only their own data.
+   */
+  async forceResetDay(date: string) {
+    const me = useAuthStore.getState().user;
+    if (!me) throw new Error("Not authenticated");
+    const { submissions, setSubmissions } = useDataStore.getState();
+    const existing = submissions.find((s) => s.userId === me.id && s.date === date);
+    if (!existing) return;
+
+    // Optimistic remove from cache
+    setSubmissions(submissions.filter((s) => s.id !== existing.id));
+
+    // Remove storage objects (best-effort) before deleting attachment rows
+    const storagePaths = existing.attachments
+      .map((a) => a.storagePath)
+      .filter((p): p is string => !!p);
+    if (storagePaths.length > 0) {
+      const { error: storErr } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .remove(storagePaths);
+      if (storErr) warn("forceResetDay.storage", storErr);
+    }
+
+    // Delete attachments rows first (FK), then the submission row
+    const { error: attErr } = await supabase
+      .from("attachments")
+      .delete()
+      .eq("submission_id", existing.id);
+    if (attErr) warn("forceResetDay.attachments", attErr);
+
+    const { error: subErr } = await supabase
+      .from("submissions")
+      .delete()
+      .eq("id", existing.id);
+    if (subErr) {
+      warn("forceResetDay.submission", subErr);
+      throw new Error("Failed to reset submission in the database.");
+    }
+
+    logService.append({
+      userId: me.id,
+      action: "submission.force_reset",
+      targetType: "submission",
+      targetId: existing.id,
+    });
+  },
+
   markStatus(id: string, status: Submission["status"]) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
