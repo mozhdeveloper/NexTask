@@ -19,13 +19,14 @@ export default function ProfilePage() {
   const submissions = useDataStore((s) => s.submissions);
   const [editOpen, setEditOpen] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stats = useMemo(() => (user ? submissionService.todayStats(user.id) : null), [user?.id, submissions]);
+
   if (!user) return null;
   const dept = departments.find((d) => d.id === user.departmentId);
   const mine = submissions.filter((s) => s.userId === user.id);
   const submitted = mine.filter((s) => s.locked).length;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stats = useMemo(() => submissionService.todayStats(user.id), [user, submissions]);
-  const monthRate = stats.month.expected > 0
+  const monthRate = stats && stats.month.expected > 0
     ? Math.round((stats.month.submitted / stats.month.expected) * 100)
     : null;
   const lateCount = mine.filter((s) => s.status === "late").length;
@@ -74,7 +75,7 @@ export default function ProfilePage() {
               {monthRate !== null ? `${monthRate}%` : "—"}
             </div>
             <div className="text-sm text-ink-muted">
-              {stats.month.submitted}/{stats.month.expected} working days
+              {stats?.month.submitted ?? 0}/{stats?.month.expected ?? 0} working days
             </div>
           </CardContent>
         </Card>
@@ -82,7 +83,7 @@ export default function ProfilePage() {
           <CardHeader><CardTitle>This Week</CardTitle></CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {stats.week.submitted}/{stats.week.expected}
+              {stats?.week.submitted ?? 0}/{stats?.week.expected ?? 0}
             </div>
             <div className="text-sm text-ink-muted">submissions</div>
           </CardContent>

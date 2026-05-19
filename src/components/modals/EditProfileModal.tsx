@@ -82,12 +82,9 @@ export function EditProfileModal({
     },
   });
 
-  if (!user) return null;
-
   // Reset to current user values every time the modal opens.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    if (open) {
+    if (open && user) {
       reset({
         name: user.name,
         email: user.email,
@@ -99,7 +96,9 @@ export function EditProfileModal({
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, user?.id]);
+
+  if (!user) return null;
 
   const submit = async (v: V) => {
     setBusy(true);
