@@ -8,7 +8,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { useDataStore } from "@/store/dataStore";
-import { useAuthStore } from "@/store/authStore";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
@@ -24,6 +23,8 @@ import type { LucideIcon } from "lucide-react";
 import { Bell, BellOff, BellRing, Smartphone } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { pushService } from "@/services/push.service";
+import { resetService } from "@/services/reset.service";
+import { authService } from "@/services/auth.service";
 
 const DAY_LABELS = [
   { short: "Sun", full: "Sunday" },
@@ -112,13 +113,14 @@ function ImportRow({
 
 export default function SettingsPage() {
   const reset = useDataStore((s) => s.reset);
-  const setUser = useAuthStore((s) => s.setUser);
   const router = useRouter();
   const user = useAuth();
   const workSettings = useDataStore((s) => s.workSettings);
   const autoBackupSettings = useDataStore((s) => s.autoBackupSettings);
 
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const [newHolidayDate, setNewHolidayDate] = useState("");
   const [newHolidayLabel, setNewHolidayLabel] = useState("");
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
@@ -128,6 +130,36 @@ export default function SettingsPage() {
   const [selectedImports, setSelectedImports] = useState<Set<string>>(new Set());
 
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
+
+  const handleReset = async () => {
+    setWiping(true);
+    try {
+      await resetService.resetDemoData();
+      reset();
+      toast.success("Demo data reset. Signing out…");
+      await authService.logout();
+      router.replace("/login");
+    } catch (e) {
+      toast.error("Reset failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setWiping(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setWiping(true);
+    try {
+      await resetService.deleteAllData();
+      reset();
+      toast.success("All data deleted. Signing out…");
+      await authService.logout();
+      router.replace("/login");
+    } catch (e) {
+      toast.error("Delete failed: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setWiping(false);
+    }
+  };
 
   const toggleDay = (day: number) => {
     const days = workSettings.workingDays.includes(day)
@@ -505,17 +537,29 @@ export default function SettingsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-danger/20 bg-red-50/40 p-4">
               <div>
                 <p className="text-sm font-medium text-ink">Reset demo data</p>
                 <p className="text-xs text-ink-muted">
-                  All users, submissions, revisions, projects, and logs will be regenerated.
-                  You will be signed out.
+                  Removes all submissions, revisions, projects, and logs from the database.
+                  Users, departments, and submission types are kept. You will be signed out.
                 </p>
               </div>
-              <Button variant="danger" onClick={() => setConfirmReset(true)}>
+              <Button variant="danger" onClick={() => setConfirmReset(true)} disabled={wiping}>
                 Reset demo data
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-danger/20 bg-red-50/40 p-4">
+              <div>
+                <p className="text-sm font-medium text-ink">Delete all data</p>
+                <p className="text-xs text-ink-muted">
+                  Permanently deletes all submissions, users (except your admin account), revisions,
+                  projects, and logs from the database. This action cannot be undone.
+                </p>
+              </div>
+              <Button variant="danger" onClick={() => setConfirmDeleteAll(true)} disabled={wiping}>
+                Delete all data
               </Button>
             </div>
           </CardContent>
@@ -613,15 +657,19 @@ export default function SettingsPage() {
         open={confirmReset}
         onOpenChange={setConfirmReset}
         title="Reset demo data?"
-        description="This will clear all changes you've made and return the workspace to defaults. You will be signed out."
+        description="This will delete all submissions, revisions, projects, and logs from the database. Users and configuration are kept. You will be signed out."
         confirmLabel="Reset and sign out"
         destructive
-        onConfirm={() => {
-          reset();
-          setUser(null);
-          toast.success("Demo data reset.");
-          router.replace("/login");
-        }}
+        onConfirm={handleReset}
+      />
+      <ConfirmModal
+        open={confirmDeleteAll}
+        onOpenChange={setConfirmDeleteAll}
+        title="Delete all data?"
+        description="This will permanently delete ALL submissions, users (except your admin account), revisions, projects, and logs from the database. This cannot be undone."
+        confirmLabel="Delete everything"
+        destructive
+        onConfirm={handleDeleteAll}
       />
     </div>
   );
