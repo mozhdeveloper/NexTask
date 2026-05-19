@@ -72,11 +72,21 @@ export const userService = {
 
   async update(id: string, patch: Partial<User>) {
     const me = useAuthStore.getState().user;
-    if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
+    if (!me) throw new Error("Not authenticated");
+    const isSelf = me.id === id;
+
+    // Only admin/manager can update other users; any role may update their own safe fields.
+    if (!isSelf && me.role !== "admin" && me.role !== "manager") throw new Error("Forbidden");
+
+    // Employees may only update their own safe profile fields (no role/dept/active changes).
+    if (me.role === "employee" && isSelf) {
+      const restricted = new Set(["role", "departmentId", "isActive"]);
+      if (Object.keys(patch).some((k) => restricted.has(k))) throw new Error("Forbidden");
+    }
 
     // Managers may only modify users in their own department and cannot
-    // change role or department assignment.
-    if (me.role === "manager") {
+    // change role or department assignment for others.
+    if (me.role === "manager" && !isSelf) {
       const target = useDataStore.getState().users.find((u) => u.id === id);
       if (!target || target.departmentId !== me.departmentId) throw new Error("Forbidden");
       if (patch.role !== undefined || patch.departmentId !== undefined)

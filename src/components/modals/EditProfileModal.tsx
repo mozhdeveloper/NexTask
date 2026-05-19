@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -37,6 +37,7 @@ const COLOR_OPTIONS = [
 const schema = z
   .object({
     name: z.string().min(2, "Name is too short"),
+    email: z.string().email("Valid email required"),
     jobTitle: z.string().optional(),
     avatarColor: z.string().min(1),
     currentPassword: z.string().optional(),
@@ -72,6 +73,7 @@ export function EditProfileModal({
     resolver: zodResolver(schema),
     defaultValues: {
       name: user?.name ?? "",
+      email: user?.email ?? "",
       jobTitle: user?.jobTitle ?? "",
       avatarColor: user?.avatarColor ?? COLOR_OPTIONS[0],
       currentPassword: "",
@@ -82,26 +84,55 @@ export function EditProfileModal({
 
   if (!user) return null;
 
+  // Reset to current user values every time the modal opens.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (open) {
+      reset({
+        name: user.name,
+        email: user.email,
+        jobTitle: user.jobTitle ?? "",
+        avatarColor: user.avatarColor,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const submit = async (v: V) => {
     setBusy(true);
     try {
-      // Profile fields
-      if (v.name !== user.name || v.jobTitle !== (user.jobTitle ?? "") || v.avatarColor !== user.avatarColor) {
-        await userService.update(user.id, {
-          name: v.name,
-          jobTitle: v.jobTitle,
-          avatarColor: v.avatarColor,
-        });
-        setUser({ ...user, name: v.name, jobTitle: v.jobTitle, avatarColor: v.avatarColor });
+      const userPatch: Record<string, unknown> = {};
+
+      // Collect profile field changes
+      if (v.name !== user.name) userPatch.name = v.name;
+      if ((v.jobTitle ?? "") !== (user.jobTitle ?? "")) userPatch.jobTitle = v.jobTitle;
+      if (v.avatarColor !== user.avatarColor) userPatch.avatarColor = v.avatarColor;
+
+      // Email change — must update Supabase Auth first, then public.users
+      const newEmail = v.email.trim();
+      if (newEmail.toLowerCase() !== user.email.toLowerCase()) {
+        const { error: authErr } = await supabase.auth.updateUser({ email: newEmail });
+        if (authErr) throw new Error(authErr.message);
+        userPatch.email = newEmail;
       }
+
+      if (Object.keys(userPatch).length > 0) {
+        await userService.update(user.id, userPatch as Partial<import("@/types").User>);
+        setUser({ ...user, ...userPatch } as typeof user);
+      }
+
       // Password change
       if (v.newPassword) {
         const { error } = await supabase.auth.updateUser({ password: v.newPassword });
         if (error) throw new Error(error.message);
         void logService.append({ userId: user.id, action: "auth.password_change", targetType: "user", targetId: user.id });
       }
+
       toast.success("Profile updated.");
-      reset({ ...v, currentPassword: "", newPassword: "", confirmPassword: "" });
+      reset({ name: v.name, email: newEmail || v.email, jobTitle: v.jobTitle, avatarColor: v.avatarColor, currentPassword: "", newPassword: "", confirmPassword: "" });
       onOpenChange(false);
     } catch (e) {
       toast.error((e as Error).message);
@@ -143,6 +174,12 @@ export function EditProfileModal({
             <Label>Name</Label>
             <Input {...register("name")} />
             {errors.name && <p className="text-xs text-danger">{errors.name.message}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input type="email" {...register("email")} />
+            {errors.email && <p className="text-xs text-danger">{errors.email.message}</p>}
           </div>
 
           <div className="space-y-1.5">
