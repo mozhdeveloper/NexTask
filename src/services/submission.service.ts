@@ -301,6 +301,7 @@ export const submissionService = {
             : status === "missing" || status === "revision_rejected"
               ? "danger"
               : "info";
+      // Notify the submission owner.
       notificationService.push({
         userId: prev.userId,
         type: tone,
@@ -308,6 +309,26 @@ export const submissionService = {
         body: `Your submission for ${prev.date} was ${action} by ${me.name}.`,
         link: "/my-submissions",
       });
+
+      // Fan-out to admins + managers for late / missing escalations.
+      if (status === "late" || status === "missing") {
+        const { users } = useDataStore.getState();
+        const label = status === "late" ? "Late submission" : "Missing submission";
+        const submissionOwner = users.find((u) => u.id === prev.userId);
+        const ownerName = submissionOwner?.name ?? "An employee";
+        users
+          .filter((u) => (u.role === "admin" || u.role === "manager") && u.id !== me.id)
+          .forEach((recipient) => {
+            const link = recipient.role === "admin" ? "/admin/submissions" : "/manager/submissions";
+            notificationService.push({
+              userId: recipient.id,
+              type: status === "late" ? "warning" : "danger",
+              title: `${label} flagged`,
+              body: `${ownerName}'s submission for ${prev.date} was marked ${status} by ${me.name}.`,
+              link,
+            });
+          });
+      }
     }
   },
 

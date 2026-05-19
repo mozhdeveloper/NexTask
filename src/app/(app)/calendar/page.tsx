@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select is still used for the user picker in PageHeader actions
 import {
   format,
   addMonths, subMonths,
@@ -89,8 +90,8 @@ function DayCell({
     <button
       onClick={() => onSelect(d, sub)}
       className={cn(
-        "group relative flex flex-col rounded-xl border text-left transition-all",
-        compact ? "min-h-[68px] p-2" : "min-h-[96px] p-3",
+        "group relative flex flex-col rounded-lg border text-left transition-all",
+        compact ? "min-h-[44px] p-1.5 sm:min-h-[68px] sm:p-2" : "min-h-[96px] p-3",
         inMonth
           ? isPicked
             ? "border-primary bg-primary-soft/30 shadow-sm"
@@ -102,7 +103,7 @@ function DayCell({
       {/* Day number */}
       <div className={cn(
         "flex items-center justify-center rounded-full font-semibold leading-none",
-        compact ? "h-6 w-6 text-xs" : "h-7 w-7 text-sm",
+        compact ? "h-5 w-5 text-[10px] sm:h-6 sm:w-6 sm:text-xs" : "h-7 w-7 text-sm",
         isToday
           ? "bg-primary text-white"
           : isPicked
@@ -114,10 +115,10 @@ function DayCell({
         {format(d, "d")}
       </div>
 
-      {/* Status chip */}
+      {/* Status chip — hidden on compact mobile cells, visible on sm+ */}
       {sub && inMonth && (
         <div className={cn(
-          "mt-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none",
+          "mt-1 hidden items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none sm:inline-flex",
           STATUS_CHIP[sub.status]
         )}>
           <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[sub.status])} />
@@ -125,6 +126,10 @@ function DayCell({
             ? STATUS_META[sub.status].label.split(" ")[0]
             : STATUS_META[sub.status].label}
         </div>
+      )}
+      {/* Mobile: just a color dot */}
+      {sub && inMonth && compact && (
+        <span className={cn("mt-0.5 h-1.5 w-1.5 rounded-full sm:hidden", STATUS_DOT[sub.status])} />
       )}
 
       {/* Summary preview (full cells only) */}
@@ -248,15 +253,15 @@ export default function CalendarPage() {
         }
       />
 
-      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* ── Toolbar row 1: navigation + view switcher ──────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {/* Period navigation */}
         {view !== "list" ? (
           <div className="flex items-center gap-1">
             <Button size="icon" variant="ghost" onClick={goBack} aria-label="Previous">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="min-w-[170px] px-1 text-center text-sm font-semibold text-ink">
+            <span className="px-1 text-center text-sm font-semibold text-ink">
               {periodLabel}
             </span>
             <Button size="icon" variant="ghost" onClick={goFwd} aria-label="Next">
@@ -267,77 +272,75 @@ export default function CalendarPage() {
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-semibold text-ink">All Submissions</div>
-            {filterStatus !== "all" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                {STATUS_META[filterStatus]?.label}
-                <button onClick={() => setFilterStatus("all")} className="ml-0.5 hover:text-primary/70">×</button>
-              </span>
-            )}
-          </div>
+          <div className="text-sm font-semibold text-ink">All Submissions</div>
         )}
 
-        <div className="flex items-center gap-2">
-          {/* Status filter */}
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3.5 w-3.5 text-ink-muted" />
-            <Select
-              value={filterStatus}
-              onValueChange={(v) => setFilterStatus(v as SubmissionStatus | "all")}
+        {/* View switcher */}
+        <div className="flex items-center rounded-lg border border-surface-border bg-white p-1 gap-0.5">
+          {([
+            { key: "month", Icon: LayoutGrid,  label: "Month" },
+            { key: "week",  Icon: CalendarDays, label: "Week"  },
+            { key: "list",  Icon: List,          label: "List"  },
+          ] as const).map(({ key, Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                view === key
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
+              )}
             >
-              <SelectTrigger className="h-8 w-40 text-xs">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_FILTER_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value} className="text-xs">
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* View switcher */}
-          <div className="flex items-center rounded-lg border border-surface-border bg-white p-1 gap-0.5">
-            {([
-              { key: "month", Icon: LayoutGrid,  label: "Month" },
-              { key: "week",  Icon: CalendarDays, label: "Week"  },
-              { key: "list",  Icon: List,          label: "List"  },
-            ] as const).map(({ key, Icon, label }) => (
-              <button
-                key={key}
-                onClick={() => setView(key)}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  view === key
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
+              <Icon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* ── Toolbar row 2: status filter chips (always visible, scrollable on mobile) */}
+      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 scrollbar-none">
+        <Filter className="h-3.5 w-3.5 shrink-0 text-ink-soft" />
+        {STATUS_FILTER_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => setFilterStatus(o.value)}
+            className={cn(
+              "shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+              filterStatus === o.value
+                ? "border-primary bg-primary text-white"
+                : "border-surface-border bg-white text-ink-muted hover:border-primary/40 hover:text-ink"
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+        {filterStatus !== "all" && (
+          <button
+            onClick={() => setFilterStatus("all")}
+            className="shrink-0 rounded-full border border-ink-soft/30 px-2.5 py-1 text-[11px] text-ink-muted hover:border-ink-soft"
+          >
+            Clear ×
+          </button>
+        )}
       </div>
 
       {/* ── MONTH VIEW ────────────────────────────────────────────────────── */}
       {view === "month" && (
         <Card>
-          <CardContent className="p-3 sm:p-4">
+          <CardContent className="p-2 sm:p-4">
             {/* Weekday headers */}
-            <div className="mb-2 grid grid-cols-7 gap-1">
+            <div className="mb-1 grid grid-cols-7 gap-0.5 sm:gap-1">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                  {d}
+                <div key={d} className="py-1 text-center text-[9px] font-semibold uppercase tracking-wide text-ink-muted sm:text-[11px]">
+                  <span className="hidden sm:inline">{d}</span>
+                  <span className="sm:hidden">{d.slice(0, 1)}</span>
                 </div>
               ))}
             </div>
             {/* Day cells */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
               {monthDays.map((d) => {
                 const iso = format(d, "yyyy-MM-dd");
                 return (
@@ -362,8 +365,9 @@ export default function CalendarPage() {
       {/* ── WEEK VIEW ─────────────────────────────────────────────────────── */}
       {view === "week" && (
         <Card>
-          <CardContent className="p-3 sm:p-4">
-            <div className="grid grid-cols-7 gap-2">
+          <CardContent className="p-2 sm:p-4">
+            <div className="overflow-x-auto -mx-1 px-1">
+            <div className="grid min-w-[480px] grid-cols-7 gap-2">
               {weekDays.map((d) => {
                 const iso = format(d, "yyyy-MM-dd");
                 const isT = isSameDay(d, today);
@@ -396,6 +400,7 @@ export default function CalendarPage() {
                   </div>
                 );
               })}
+            </div>
             </div>
             <Legend />
           </CardContent>
