@@ -46,10 +46,15 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "dialog-in": {
+          from: { opacity: "0", transform: "translate(-50%, calc(-50% + 12px)) scale(0.97)" },
+          to: { opacity: "1", transform: "translate(-50%, -50%) scale(1)" },
+        },
       },
       animation: {
         "fade-in": "fade-in .2s ease-out",
         "slide-up": "slide-up .25s ease-out",
+        "dialog-in": "dialog-in .22s cubic-bezier(0.16,1,0.3,1)",
       },
     },
   },
