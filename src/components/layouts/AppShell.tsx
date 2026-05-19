@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { MobileBottomNav } from "./MobileBottomNav";
 import { cn } from "@/lib/utils";
 import { useAutoBackup } from "@/hooks/useAutoBackup";
 import { useBootstrap } from "@/hooks/useBootstrap";
@@ -44,9 +45,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header onToggleSidebar={handleToggle} />
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-surface-subtle">
-          <div className="mx-auto max-w-[1440px] p-4 md:p-6">{children}</div>
+          <div className="mx-auto max-w-[1440px] p-4 pb-24 md:p-6 lg:pb-6">{children}</div>
         </main>
       </div>
+      <MobileBottomNav />
     </div>
   );
 }

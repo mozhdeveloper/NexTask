@@ -48,6 +48,22 @@ export const notificationService = {
         if (error) warn("push", error);
       });
 
+    // Fire-and-forget Web Push to the recipient's registered devices.
+    // Fails silently if VAPID is unconfigured or the user has no subscription.
+    fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userIds: [item.userId],
+        title: item.title,
+        body: item.body,
+        url: item.link ?? "/dashboard",
+        tag: `ntf-${item.type}`,
+      }),
+    }).catch(() => {
+      /* push is best-effort; ignore network errors */
+    });
+
     return item;
   },
 

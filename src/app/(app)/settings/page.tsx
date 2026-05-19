@@ -21,6 +21,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { Holiday } from "@/types";
 import type { LucideIcon } from "lucide-react";
+import { Bell, BellOff, BellRing, Smartphone } from "lucide-react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { pushService } from "@/services/push.service";
 
 const DAY_LABELS = [
   { short: "Sun", full: "Sunday" },
@@ -222,6 +225,9 @@ export default function SettingsPage() {
           <p className="mt-3 text-xs text-ink-soft">Dark mode support is coming in a future update.</p>
         </CardContent>
       </Card>
+
+      {/* ── Push Notifications ── */}
+      <PushNotificationsCard />
 
       {/* ── Working Days ── */}
       {isAdminOrManager && (
@@ -611,5 +617,114 @@ export default function SettingsPage() {
         }}
       />
     </div>
+  );
+}
+
+// ── Push Notifications card ────────────────────────────────────────────
+function PushNotificationsCard() {
+  const user = useAuth();
+  const { supported, permission, subscribed, busy, enable, disable } =
+    usePushNotifications(user?.id);
+
+  const blocked = permission === "denied";
+
+  const toggle = async () => {
+    if (!user) return;
+    if (subscribed) {
+      const ok = await disable();
+      if (ok) toast.success("Push notifications disabled on this device.");
+      else toast.error("Couldn't disable push notifications.");
+      return;
+    }
+    if (blocked) {
+      toast.error("Notifications are blocked. Allow them in your browser site settings.");
+      return;
+    }
+    const ok = await enable();
+    if (ok) toast.success("Push notifications enabled on this device.");
+    else toast.error("Push notifications were not enabled.");
+  };
+
+  const sendTest = async () => {
+    if (!user) return;
+    const res = await pushService.sendTo({
+      userIds: [user.id],
+      title: "NexTask test notification",
+      body: "If you see this, push notifications are working.",
+      url: "/dashboard",
+      tag: "nextask-test",
+    });
+    if (res.sent > 0) toast.success(`Test sent (${res.sent} device${res.sent > 1 ? "s" : ""}).`);
+    else toast.error("No active devices received the test.");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <SectionIcon icon={BellRing} className="bg-primary-soft text-primary" />
+          <div className="min-w-0">
+            <CardTitle>Push Notifications</CardTitle>
+            <CardDescription>
+              Get instant alerts on this device for new tasks, revisions, and reminders — even when the app is closed.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-border bg-surface-subtle/60 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full",
+                subscribed ? "bg-success-soft text-success" : "bg-surface-border text-ink-soft",
+              )}
+            >
+              {subscribed ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink">
+                {!supported
+                  ? "Not supported on this browser"
+                  : subscribed
+                  ? "Enabled on this device"
+                  : blocked
+                  ? "Blocked by browser"
+                  : "Disabled"}
+              </p>
+              <p className="text-xs text-ink-muted">
+                {!supported
+                  ? "Try the latest Chrome, Edge, Firefox, or install the app on iOS 16.4+."
+                  : subscribed
+                  ? "You can disable any time. Each device must be enabled separately."
+                  : blocked
+                  ? "Open browser site settings to allow notifications, then come back."
+                  : "Allow notifications to start receiving alerts."}
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant={subscribed ? "outline" : "default"}
+            onClick={toggle}
+            disabled={!supported || busy}
+          >
+            {busy ? "Working…" : subscribed ? "Disable" : "Enable"}
+          </Button>
+        </div>
+
+        {subscribed && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-surface-border px-4 py-3">
+            <div className="flex items-center gap-2 text-xs text-ink-muted">
+              <Smartphone className="h-3.5 w-3.5" />
+              Send a test to verify this device is reachable.
+            </div>
+            <Button size="sm" variant="ghost" onClick={sendTest}>
+              Send test
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

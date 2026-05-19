@@ -148,6 +148,11 @@ describe("submissionService.forUserOnDate", () => {
 
 // ─── markStatus ───────────────────────────────────────────────────────────────
 describe("submissionService.markStatus", () => {
+  beforeEach(() => {
+    // markStatus requires admin/manager role.
+    authState.user = { id: "u_admin", role: "admin", name: "Admin" };
+  });
+
   it("should update the submission status in the local cache", async () => {
     const s = createSubmission({ id: "sub_1", status: "pending" });
     submissions = [s];
@@ -178,6 +183,43 @@ describe("submissionService.markStatus", () => {
     expect(logService.append).toHaveBeenCalledWith(
       expect.objectContaining({ action: "submission.mark_status" })
     );
+  });
+
+  it("notifies the submission owner when an admin changes their status", async () => {
+    // Caller is admin, submission owner is u_emp.
+    authState.user = { id: "u_admin", role: "admin", name: "Admin" };
+    submissions = [createSubmission({ id: "sub_1", userId: "u_emp", status: "pending" })];
+    const { notificationService } = await import("@/services/notification.service");
+
+    await submissionService.markStatus("sub_1", "excused");
+
+    expect(notificationService.push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u_emp",
+        type: "success",
+        link: "/my-submissions",
+      })
+    );
+  });
+
+  it("does NOT notify when the status didn't actually change", async () => {
+    authState.user = { id: "u_admin", role: "admin", name: "Admin" };
+    submissions = [createSubmission({ id: "sub_1", userId: "u_emp", status: "submitted" })];
+    const { notificationService } = await import("@/services/notification.service");
+
+    await submissionService.markStatus("sub_1", "submitted");
+
+    expect(notificationService.push).not.toHaveBeenCalled();
+  });
+
+  it("does NOT notify when a user updates their own submission status", async () => {
+    authState.user = { id: "u_emp", role: "admin", name: "Self Admin" };
+    submissions = [createSubmission({ id: "sub_1", userId: "u_emp", status: "pending" })];
+    const { notificationService } = await import("@/services/notification.service");
+
+    await submissionService.markStatus("sub_1", "submitted");
+
+    expect(notificationService.push).not.toHaveBeenCalled();
   });
 });
 

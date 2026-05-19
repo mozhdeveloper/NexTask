@@ -1,14 +1,37 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { ServiceWorkerRegister } from "@/components/pwa/ServiceWorkerRegister";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+
+export const viewport: Viewport = {
+  themeColor: "#66B2B2",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "NexTask — NexVision Innovations",
   description:
     "Local-first internal office submission and compliance management system.",
+  applicationName: "NexTask",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "NexTask",
+  },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: "/brand/ntlogo.jpg",
+    apple: "/brand/ntlogo.jpg",
+    shortcut: "/brand/ntlogo.jpg",
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +47,8 @@ export default function RootLayout({
           closeButton
           toastOptions={{ style: { fontFamily: "var(--font-inter)" } }}
         />
+        <ServiceWorkerRegister />
+        <InstallPrompt />
       </body>
     </html>
   );

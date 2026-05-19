@@ -257,6 +257,7 @@ export const submissionService = {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
     const { submissions, setSubmissions } = useDataStore.getState();
+    const prev = submissions.find((s) => s.id === id);
     setSubmissions(submissions.map((s) => (s.id === id ? { ...s, status } : s)));
     supabase
       .from("submissions")
@@ -271,6 +272,36 @@ export const submissionService = {
         action: "submission.mark_status",
         targetType: "submission",
         targetId: id,
+      });
+    }
+    // Notify the submission owner (if status actually changed and isn't self-update).
+    if (prev && prev.status !== status && prev.userId !== me.id) {
+      const statusLabels: Record<string, string> = {
+        submitted: "marked as submitted",
+        late: "marked as late",
+        missing: "marked as missing",
+        excused: "excused (no submission required)",
+        revision_requested: "sent back for revision",
+        revision_approved: "revision approved",
+        revision_rejected: "revision rejected",
+        locked: "locked",
+        pending: "reopened",
+      };
+      const action = statusLabels[status] ?? `updated to ${status}`;
+      const tone: "success" | "warning" | "danger" | "info" =
+        status === "submitted" || status === "revision_approved" || status === "excused"
+          ? "success"
+          : status === "revision_requested" || status === "late"
+            ? "warning"
+            : status === "missing" || status === "revision_rejected"
+              ? "danger"
+              : "info";
+      notificationService.push({
+        userId: prev.userId,
+        type: tone,
+        title: "Submission status updated",
+        body: `Your submission for ${prev.date} was ${action} by ${me.name}.`,
+        link: "/my-submissions",
       });
     }
   },

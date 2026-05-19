@@ -1,0 +1,46 @@
+{
+  "name": "NexTask — NexVision Innovations",
+  "short_name": "NexTask",
+  "description": "Internal office submission and compliance management system.",
+  "id": "/",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#F7F9FB",
+  "theme_color": "#66B2B2",
+  "categories": ["business", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "/brand/ntlogo.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "any" },
+    { "src": "/brand/ntlogo.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" },
+    { "src": "/brand/ntlogo.jpg", "sizes": "192x192", "type": "image/jpeg", "purpose": "maskable" },
+    { "src": "/brand/ntlogo.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "My Work",
+      "short_name": "Work",
+      "description": "View today's tasks",
+      "url": "/my-work",
+      "icons": [{ "src": "/brand/ntlogo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "description": "Open the calendar",
+      "url": "/calendar",
+      "icons": [{ "src": "/brand/ntlogo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
+    },
+    {
+      "name": "Submissions",
+      "short_name": "Submit",
+      "description": "Go to my submissions",
+      "url": "/my-submissions",
+      "icons": [{ "src": "/brand/ntlogo.jpg", "sizes": "192x192", "type": "image/jpeg" }]
+    }
+  ]
+}
