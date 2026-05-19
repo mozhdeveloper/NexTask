@@ -66,7 +66,9 @@ export function SubmissionDetailsModal({
   };
 
   const canRequestRevision =
-    me?.id === submission.userId && submission.locked && submission.status !== "revision_requested";
+    me?.id === submission.userId &&
+    submission.locked &&
+    !["revision_requested", "revision_rejected"].includes(submission.status);
 
   return (
     <>

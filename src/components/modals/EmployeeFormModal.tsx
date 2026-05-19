@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -89,6 +89,30 @@ export function EmployeeFormModal({
           password: "",
         },
   });
+
+  // Sync form values whenever the modal opens or the editing target changes.
+  useEffect(() => {
+    if (editing) {
+      reset({
+        name: editing.name,
+        email: editing.email,
+        jobTitle: editing.jobTitle ?? "",
+        role: editing.role,
+        departmentId: editing.departmentId ?? (departments[0]?.id ?? ""),
+      });
+    } else {
+      reset({
+        name: "",
+        email: "",
+        jobTitle: "",
+        role: "employee",
+        departmentId: managerDeptId ?? (departments[0]?.id ?? ""),
+        password: "",
+      });
+      setShowPwd(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
 
   const onGenerate = () => {
     const pwd = generatePassword();

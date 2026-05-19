@@ -109,7 +109,7 @@ export default function MySubmissionsPage() {
                         <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => { setSelected(s); setOpen(true); }}>View details</DropdownMenuItem>
-                          {s.locked && s.status !== "revision_requested" && (
+                          {s.locked && !["revision_requested","revision_rejected"].includes(s.status) && (
                             <DropdownMenuItem onClick={() => { setRevFor(s.id); setRevOpen(true); }}>Request revision</DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
