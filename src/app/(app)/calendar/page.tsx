@@ -30,6 +30,12 @@ import { workSettingsService } from "@/services/workSettings.service";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 
+// Statuses that count as "submitted" for the day badge and modal header.
+const SUBMITTED_STATUSES = new Set<SubmissionStatus>([
+  "submitted", "late", "locked",
+  "revision_requested", "revision_approved", "revision_rejected",
+]);
+
 // ─── constants ────────────────────────────────────────────────────────────────
 type CalView = "month" | "week" | "list";
 type ListGrouping = "day" | "week" | "month";
@@ -228,15 +234,14 @@ export default function CalendarPage() {
     return allActiveEmployees;
   }, [user?.role, user?.departmentId, allActiveEmployees]);
 
-  // Per-day submitted count (across ALL active employees, regardless of viewer scope).
+  // Per-day submitted count — only SUBMITTED_STATUSES so it matches the modal header.
   const dayCountMap = useMemo(() => {
     const m = new Map<string, number>();
     const employeeIds = new Set(allActiveEmployees.map((u) => u.id));
     submissions
-      .filter((s) => employeeIds.has(s.userId))
+      .filter((s) => employeeIds.has(s.userId) && SUBMITTED_STATUSES.has(s.status))
       .forEach((s) => {
-        const prev = m.get(s.date) ?? 0;
-        m.set(s.date, prev + 1);
+        m.set(s.date, (m.get(s.date) ?? 0) + 1);
       });
     return m;
   }, [submissions, allActiveEmployees]);

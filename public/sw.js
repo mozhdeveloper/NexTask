@@ -72,12 +72,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets → cache-first (Next chunks, images, fonts)
+  // Static assets → network-first for versioned dev assets (?v=), cache-first otherwise.
   if (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/brand/") ||
     /\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|webp|svg|ico)$/.test(url.pathname)
   ) {
+    // Dev-mode assets have a ?v= cache-buster — always go network-first so HMR works.
+    if (url.search.includes("v=")) {
+      event.respondWith(
+        fetch(req)
+          .then((res) => {
+            const copy = res.clone();
+            caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            return res;
+          })
+          .catch(() => caches.match(req).then((c) => c || Response.error())),
+      );
+      return;
+    }
+    // Production immutable assets — cache-first.
     event.respondWith(
       caches.match(req).then(
         (cached) =>
@@ -86,7 +100,7 @@ self.addEventListener("fetch", (event) => {
             const copy = res.clone();
             caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy)).catch(() => {});
             return res;
-          }),
+          }).catch(() => Response.error()),
       ),
     );
     return;

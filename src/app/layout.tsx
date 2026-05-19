@@ -26,6 +26,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "NexTask",
   },
+  other: {
+    // Non-deprecated equivalent of apple-mobile-web-app-capable
+    "mobile-web-app-capable": "yes",
+  },
   formatDetection: { telephone: false },
   icons: {
     icon: "/brand/ntlogo.jpg",

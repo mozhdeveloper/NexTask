@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import {
-  Users, Search, CheckCircle2, Clock3, AlertCircle, Filter, ChevronDown,
+  Users, Search, CheckCircle2, Clock3, AlertCircle, ChevronDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -37,18 +37,15 @@ const ALL_STATUSES: SubmissionStatus[] = [
   "revision_requested", "revision_approved", "revision_rejected", "excused",
 ];
 
-const CHIP_FILTERS: Array<SubmissionStatus | "all" | "missing"> = [
-  "all", "submitted", "late", "pending", "missing", "revision_requested",
+// Status filter options for the Select dropdown
+const STATUS_FILTER_OPTIONS: Array<{ value: SubmissionStatus | "all" | "missing"; label: string }> = [
+  { value: "all",                label: "All statuses" },
+  { value: "submitted",          label: "Submitted" },
+  { value: "late",               label: "Late" },
+  { value: "pending",            label: "Pending" },
+  { value: "missing",            label: "No submission" },
+  { value: "revision_requested", label: "Revision Requested" },
 ];
-
-const CHIP_LABELS: Partial<Record<SubmissionStatus | "all" | "missing", string>> = {
-  all: "All",
-  submitted: "Submitted",
-  late: "Late",
-  pending: "Pending",
-  missing: "No sub",
-  revision_requested: "Revision",
-};
 
 // --- EmployeeRow -----------------------------------------------------------
 function EmployeeRow({
@@ -257,24 +254,22 @@ export function DayDetailModal({
                 value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="h-3.5 w-3.5 flex-shrink-0 text-ink-soft" />
-              <div className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
-                {CHIP_FILTERS.map((s) => (
-                  <button key={s}
-                    onClick={() => setStatusFilter(s as SubmissionStatus | "all")}
-                    className={cn(
-                      "shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap",
-                      statusFilter === s
-                        ? "border-primary bg-primary text-white"
-                        : "border-surface-border bg-white text-ink-muted hover:border-primary/40 hover:text-ink",
-                    )}>
-                    {CHIP_LABELS[s] ?? s}
-                  </button>
-                ))}
-              </div>
+              <Select
+                value={statusFilter as string}
+                onValueChange={(v) => setStatusFilter(v as SubmissionStatus | "all" | "missing")}
+              >
+                <SelectTrigger className="h-8 flex-1 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_FILTER_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {departments.length > 1 && (
                 <Select value={deptFilter} onValueChange={setDeptFilter}>
-                  <SelectTrigger className="h-7 w-32 text-xs flex-shrink-0">
+                  <SelectTrigger className="h-8 flex-1 text-xs">
                     <SelectValue placeholder="All depts" />
                   </SelectTrigger>
                   <SelectContent>
