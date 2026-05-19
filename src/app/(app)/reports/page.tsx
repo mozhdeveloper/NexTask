@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import {
   CalendarDays, Clock, AlertTriangle, UserCheck, Building2, Database,
   Download, FileSpreadsheet, FileText, FileType2, Eye, Sparkles,
@@ -69,6 +69,7 @@ export default function ReportsPage() {
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(1);
+  const [isPending, startTransition] = useTransition();
 
   const scope = useMemo<ReportScope>(() => {
     if (scopeKind === "today") return { kind: "today" };
@@ -76,11 +77,15 @@ export default function ReportsPage() {
     return { kind: scopeKind, date: anchor };
   }, [scopeKind, anchor, rangeStart, rangeEnd]);
 
-  // Reactive preview — reruns when data or scope changes.
+  // Deferred so scope/type changes don't block the render cycle.
+  const deferredType  = useDeferredValue(type);
+  const deferredScope = useDeferredValue(scope);
+
+  // Reactive preview — only reruns when deferred values settle.
   const rows = useMemo(
-    () => (ready ? reportService.preview(type, scope) : []),
+    () => (ready ? reportService.preview(deferredType, deferredScope) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, type, scope, submissions, users, departments, backups],
+    [ready, deferredType, deferredScope, submissions, users, departments, backups],
   );
 
   // Reset to page 1 whenever the report type or scope changes.
@@ -124,7 +129,7 @@ export default function ReportsPage() {
             <button
               key={r.type}
               type="button"
-              onClick={() => setType(r.type)}
+              onClick={() => startTransition(() => setType(r.type))}
               className={cn(
                 "group relative rounded-xl border bg-surface p-4 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 active
@@ -174,7 +179,7 @@ export default function ReportsPage() {
             {/* Scope */}
             <div className="space-y-1.5">
               <Label className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Date scope</Label>
-              <Select value={scopeKind} onValueChange={(v) => setScopeKind(v as ScopeKind)}>
+              <Select value={scopeKind} onValueChange={(v) => startTransition(() => setScopeKind(v as ScopeKind))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SCOPE_OPTIONS.map((o) => (
@@ -271,7 +276,7 @@ export default function ReportsPage() {
       </Card>
 
       {/* ── Preview ──────────────────────────────────────────────────────── */}
-      <Card>
+      <Card className={cn("transition-opacity duration-200", isPending && "opacity-50")}>
         <CardHeader className="pb-2">
           <div className="flex items-start gap-3">
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-chip-teal text-teal-700">

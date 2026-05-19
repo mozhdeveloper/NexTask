@@ -90,10 +90,13 @@ function inRange(iso: string, start: string, end: string): boolean {
 
 // ─── Row builders ────────────────────────────────────────────────────────────
 function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unknown>> {
-  const { submissions, users, departments, backups } = useDataStore.getState();
-  const userById = (id: string) => users.find((u) => u.id === id);
-  const deptById = (id: string | null) =>
-    departments.find((d) => d.id === id)?.name ?? "—";
+  const { submissions, users, departments, backups, workSettings } = useDataStore.getState();
+
+  // O(1) lookup maps — built once per call, not per-row.
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const deptMap = new Map(departments.map((d) => [d.id, d.name]));
+  const userById = (id: string) => userMap.get(id);
+  const deptById = (id: string | null) => (id && deptMap.get(id)) || "—";
 
   const { start, end } = resolveRange(scope);
 
@@ -150,7 +153,10 @@ function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unk
       const today = todayISO();
       const cap = end < today ? end : today;
       for (let d = start; d <= cap; d = addDays(d, 1)) {
-        if (!workSettingsService.isWorkingDay(d)) continue;
+        // Inline working-day check — uses already-cached workSettings, no getState() per iteration.
+        const dt = new Date(d + "T12:00:00");
+        if (!workSettings.workingDays.includes(dt.getDay())) continue;
+        if (workSettings.holidays.some((h) => h.date === d)) continue;
         for (const u of activeWorkers) {
           if (submittedSet.has(`${u.id}|${d}`)) continue;
           if (d === today && !workSettingsService.isPastWorkEnd()) continue;
