@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import type { Submission, User, Department } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 
-// â”€â”€â”€ constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- constants -------------------------------------------------------------
 const SUBMITTED_STATUSES = new Set<SubmissionStatus>([
   "submitted", "late", "locked",
   "revision_requested", "revision_approved", "revision_rejected",
@@ -50,7 +50,7 @@ const CHIP_LABELS: Partial<Record<SubmissionStatus | "all" | "missing", string>>
   revision_requested: "Revision",
 };
 
-// â”€â”€â”€ EmployeeRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- EmployeeRow -----------------------------------------------------------
 function EmployeeRow({
   user, sub, canOverride, onView, onStatusChanged,
 }: {
@@ -139,14 +139,14 @@ function EmployeeRow({
             </SelectContent>
           </Select>
           <Button size="sm" className="h-7 px-3 text-xs" onClick={applyOverride}>Apply</Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOverriding(false)}>âœ•</Button>
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setOverriding(false)}>&#x2715;</Button>
         </div>
       )}
     </li>
   );
 }
 
-// â”€â”€â”€ DayDetailModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- DayDetailModal --------------------------------------------------------
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -253,7 +253,7 @@ export function DayDetailModal({
           <div className="flex-shrink-0 border-b border-surface-border px-4 py-2.5 space-y-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-ink-muted" />
-              <Input className="pl-8 h-8 text-sm" placeholder="Search employeeâ€¦"
+              <Input className="pl-8 h-8 text-sm" placeholder="Search employee..."
                 value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export function DayDetailModal({
             <p className="text-[11px] text-ink-soft">
               {rows.length} of {scopedEmployees.length} shown
               {submittedInScope > 0 && (
-                <> Â· <span className="text-emerald-600 font-medium">{submittedInScope} submitted in scope</span></>
+                <> &middot; <span className="text-emerald-600 font-medium">{submittedInScope} submitted in scope</span></>
               )}
             </p>
           </div>

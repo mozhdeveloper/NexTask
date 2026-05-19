@@ -154,8 +154,8 @@ function DayCell({
         </p>
       )}
 
-      {/* Submitted / total count badge */}
-      {inMonth && typeof submittedCount === "number" && typeof totalCount === "number" && (
+      {/* Submitted / total count badge — only when at least one submitted */}
+      {inMonth && typeof submittedCount === "number" && typeof totalCount === "number" && submittedCount > 0 && (
         <span className={cn(
           "mt-auto inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-none",
           compact ? "hidden sm:inline-flex" : "inline-flex",
