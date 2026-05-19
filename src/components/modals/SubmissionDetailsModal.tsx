@@ -97,7 +97,7 @@ export function SubmissionDetailsModal({
   return (
     <>
       <Dialog open={open} onOpenChange={(v) => { if (!v) setOverriding(false); onOpenChange(v); }}>
-        <DialogContent className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent hideClose className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between gap-2">
               <DialogTitle>Submission details</DialogTitle>
