@@ -19,10 +19,19 @@ export async function POST(req: Request) {
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  // Resolve the caller's public user id so the delete is scoped to their own subscriptions only.
+  const { data: profile } = await sb
+    .from("users")
+    .select("id")
+    .eq("auth_user_id", auth.user.id)
+    .maybeSingle();
+  if (!profile) return NextResponse.json({ error: "No profile" }, { status: 404 });
+
   const { error } = await supabaseAdmin
     .from("push_subscriptions")
     .delete()
-    .eq("endpoint", body.endpoint);
+    .eq("endpoint", body.endpoint)
+    .eq("user_id", (profile as { id: string }).id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
