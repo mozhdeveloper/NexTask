@@ -560,3 +560,4 @@ function formatElapsed(start: Date, end: Date, _tick?: number): string {
   const m = Math.floor((ms % 3_600_000) / 60_000);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
