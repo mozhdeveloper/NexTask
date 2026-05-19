@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight,
-  CalendarDays, LayoutGrid, List, FileText, Filter,
+  CalendarDays, LayoutGrid, List, FileText,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -69,18 +69,7 @@ const LEGEND: SubmissionStatus[] = [
   "submitted", "pending", "late", "missing", "revision_requested",
 ];
 
-const STATUS_FILTER_OPTIONS: { value: SubmissionStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "submitted", label: "Submitted" },
-  { value: "pending", label: "Pending" },
-  { value: "late", label: "Late" },
-  { value: "missing", label: "Missing" },
-  { value: "revision_requested", label: "Revision Requested" },
-  { value: "revision_approved", label: "Revision Approved" },
-  { value: "revision_rejected", label: "Revision Rejected" },
-  { value: "excused", label: "Excused" },
-  { value: "locked", label: "Locked" },
-];
+
 
 // ─── DayCell ─────────────────────────────────────────────────────────────────
 function DayCell({
@@ -217,7 +206,6 @@ export default function CalendarPage() {
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
   const [listGrouping, setListGrouping] = useState<ListGrouping>("month");
-  const [filterStatus, setFilterStatus] = useState<SubmissionStatus | "all">("all");
 
   // ── employee pool ─────────────────────────────────────────────────────────
   // All active employees (no managers/admins) used for count badges.
@@ -266,10 +254,9 @@ export default function CalendarPage() {
     const m = new Map<string, Submission>();
     submissions
       .filter((s) => s.userId === effectiveId)
-      .filter((s) => filterStatus === "all" || s.status === filterStatus)
       .forEach((s) => m.set(s.date, s));
     return m;
-  }, [effectiveId, submissions, filterStatus]);
+  }, [effectiveId, submissions]);
 
 
   // ── navigation ────────────────────────────────────────────────────────────
@@ -304,13 +291,12 @@ export default function CalendarPage() {
     }
     return [...submissions]
       .filter((s) => s.userId === effectiveId)
-      .filter((s) => filterStatus === "all" || s.status === filterStatus)
       .filter((s) => {
         const d = parseISO(s.date);
         return isWithinInterval(d, { start: intervalStart, end: intervalEnd });
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [submissions, effectiveId, filterStatus, listGrouping]);
+  }, [submissions, effectiveId, listGrouping]);
 
   if (!user || !effectiveUser) return null;
 
@@ -421,32 +407,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ── Toolbar row 2: status filter chips (always visible, scrollable on mobile) */}
-      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 scrollbar-none">
-        <Filter className="h-3.5 w-3.5 shrink-0 text-ink-soft" />
-        {STATUS_FILTER_OPTIONS.map((o) => (
-          <button
-            key={o.value}
-            onClick={() => setFilterStatus(o.value)}
-            className={cn(
-              "shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
-              filterStatus === o.value
-                ? "border-primary bg-primary text-white"
-                : "border-surface-border bg-white text-ink-muted hover:border-primary/40 hover:text-ink"
-            )}
-          >
-            {o.label}
-          </button>
-        ))}
-        {filterStatus !== "all" && (
-          <button
-            onClick={() => setFilterStatus("all")}
-            className="shrink-0 rounded-full border border-ink-soft/30 px-2.5 py-1 text-[11px] text-ink-muted hover:border-ink-soft"
-          >
-            Clear ×
-          </button>
-        )}
-      </div>
+
 
       {/* ── MONTH VIEW ────────────────────────────────────────────────────── */}
       {view === "month" && (
@@ -541,9 +502,11 @@ export default function CalendarPage() {
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-subtle">
                 <FileText className="h-6 w-6 text-ink-soft" />
               </div>
-              <p className="font-semibold text-ink">No submissions yet</p>
+              <p className="font-semibold text-ink">No submissions found</p>
               <p className="mt-1 text-sm text-ink-muted">
-                Your submitted work will appear here once you start submitting.
+                {isSelf
+                  ? "Your submitted work will appear here once you start submitting."
+                  : `No submissions found for ${effectiveUser.name} in this period.`}
               </p>
             </CardContent>
           ) : (
