@@ -142,7 +142,7 @@ export function SubmitWorkForm({
       });
       toast.success("Work submitted successfully.");
       setFiles([]);
-      reset({ date: v.date, workSummary: v.workSummary, tasksDetails: v.tasksDetails });
+      reset({ date: v.date, taskTitle: "", workSummary: v.workSummary, tasksDetails: v.tasksDetails });
       onSubmitted?.();
     } catch (e) {
       toast.error((e as Error).message);

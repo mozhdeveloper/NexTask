@@ -304,7 +304,10 @@ export default function ActivityLogPage() {
               <SelectTrigger className="w-full sm:w-48"><SelectValue placeholder="All users" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
-                {users.filter((u) => u.isActive).map((u) => (
+                {(isManager && deptEmployeeIds
+                  ? users.filter((u) => deptEmployeeIds.has(u.id))
+                  : users.filter((u) => u.isActive)
+                ).map((u) => (
                   <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                 ))}
               </SelectContent>

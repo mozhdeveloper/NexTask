@@ -10,6 +10,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataStore } from "@/store/dataStore";
+import { useAuth } from "@/hooks/useAuth";
 import { userService } from "@/services/user.service";
 import type { Role } from "@/lib/constants";
 import type { User } from "@/types";
@@ -55,6 +56,10 @@ export function EmployeeFormModal({
   editing?: User | null;
 }) {
   const departments = useDataStore((s) => s.departments);
+  const me = useAuth();
+  const isManager = me?.role === "manager";
+  // When a manager is creating an employee, lock dept to their own department.
+  const managerDeptId = isManager ? (me?.departmentId ?? departments[0]?.id ?? "") : null;
   const [busy, setBusy] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const {
@@ -80,7 +85,7 @@ export function EmployeeFormModal({
           email: "",
           jobTitle: "",
           role: "employee",
-          departmentId: departments[0]?.id ?? "",
+          departmentId: managerDeptId ?? (departments[0]?.id ?? ""),
           password: "",
         },
   });
@@ -164,21 +169,24 @@ export function EmployeeFormModal({
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={watch("role")} onValueChange={(v) => setValue("role", v as Role)}>
+              <Select value={watch("role")} onValueChange={(v) => setValue("role", v as Role)} disabled={isManager && !editing}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
+                  {!isManager && <SelectItem value="admin">Admin</SelectItem>}
+                  {!isManager && <SelectItem value="manager">Manager</SelectItem>}
                   <SelectItem value="employee">Employee</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>Department</Label>
-              <Select value={watch("departmentId")} onValueChange={(v) => setValue("departmentId", v)}>
-                <SelectTrigger>
+              <Select
+                value={watch("departmentId")}
+                onValueChange={(v) => setValue("departmentId", v)}
+                disabled={!!managerDeptId && !editing}
+              >                <SelectTrigger>
                   <SelectValue placeholder="Select a department" />
                 </SelectTrigger>
                 <SelectContent>
