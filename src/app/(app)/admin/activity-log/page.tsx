@@ -5,7 +5,7 @@ import {
   UserPlus, UserCog, Users, FolderPlus, Folder, FolderMinus,
   Settings, HardDrive, FileDown, AlertTriangle, RefreshCw,
   Download, Search, Activity, ShieldCheck, CalendarOff, CalendarPlus,
-  ClipboardCheck, Pencil,
+  ClipboardCheck, Pencil, Bell,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -58,9 +58,14 @@ const ACTION_META: Record<string, ActionMeta> = {
   "settings.holiday_remove":      { label: "Removed holiday",         Icon: CalendarOff,    bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
   "settings.working_days_update": { label: "Updated working days",    Icon: Settings,       bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
   "settings.permissions_update":  { label: "Updated permissions",     Icon: ShieldCheck,    bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
-  "backup.run":                   { label: "Ran backup",              Icon: HardDrive,      bg: "bg-purple-100",  text: "text-purple-600",  badgeVariant: "muted",    group: "backup" },
-  "report.export":                { label: "Exported report",         Icon: FileDown,       bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "report" },
-  "db.reset":                     { label: "Reset database",          Icon: AlertTriangle,  bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "system" },
+  "backup.run":                    { label: "Ran backup",              Icon: HardDrive,      bg: "bg-purple-100",  text: "text-purple-600",  badgeVariant: "muted",    group: "backup" },
+  "report.export":                 { label: "Exported report",         Icon: FileDown,       bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "report" },
+  "db.reset":                      { label: "Reset database",          Icon: AlertTriangle,  bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "system" },
+  "reminder.send":                 { label: "Sent reminders",          Icon: Bell,           bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "user" },
+  "download.file":                 { label: "Downloaded attachment",   Icon: Download,       bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "submission" },
+  "project.revision_requested":    { label: "Requested project revision", Icon: Pencil,      bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "project" },
+  "project.revision_approved":     { label: "Approved project revision", Icon: CheckCircle2, bg: "bg-emerald-100", text: "text-emerald-600", badgeVariant: "success",  group: "project" },
+  "project.revision_rejected":     { label: "Rejected project revision", Icon: XCircle,     bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "project" },
 };
 
 function getMeta(action: string): ActionMeta {

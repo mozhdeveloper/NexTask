@@ -32,6 +32,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { reportService } from "@/services/report.service";
 import { complianceService } from "@/services/compliance.service";
+import { notificationService } from "@/services/notification.service";
+import { logService } from "@/services/log.service";
 
 export default function AdminDashboard() {
   const users = useDataStore((s) => s.users);
@@ -121,7 +123,20 @@ export default function AdminDashboard() {
     .filter((c) => c.effectiveStatus === "late" || c.effectiveStatus === "missing")
     .slice(0, 5);
 
-  const sendReminders = () => toast.success(`Reminders sent to ${overdueCells.length} employee(s).`);
+  const sendReminders = () => {
+    if (overdueCells.length === 0) { toast.info("No overdue employees right now."); return; }
+    overdueCells.forEach((cell) =>
+      notificationService.push({
+        userId: cell.user.id,
+        type: "warning",
+        title: "Submission reminder",
+        body: `You have not submitted your daily work yet. Please submit before the end of the working day.`,
+        link: "/my-work",
+      })
+    );
+    void logService.append({ action: "reminder.send", targetType: "user", targetId: overdueCells.map((c) => c.user.id).join(","), userId: me!.id });
+    toast.success(`Reminders sent to ${overdueCells.length} employee(s).`);
+  };
   const downloadReport = () => {
     reportService.export("daily", "csv");
     toast.success("Daily report downloaded.");
