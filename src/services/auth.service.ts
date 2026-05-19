@@ -2,6 +2,7 @@
 // The Zustand authStore stays the in-component source of truth so React can subscribe.
 
 import { useAuthStore } from "@/store/authStore";
+import { useDataStore } from "@/store/dataStore";
 import { supabase } from "@/lib/supabase/client";
 import { mapUser } from "@/lib/supabase/mappers";
 import type { DbUserRow } from "@/lib/supabase/types";
@@ -75,6 +76,16 @@ export const authService = {
     }
     await supabase.auth.signOut();
     useAuthStore.getState().setUser(null);
+    // Clear dynamic user data so a second user logging in on the same tab
+    // does not briefly see the previous user's submissions / notifications.
+    const ds = useDataStore.getState();
+    ds.setUsers([]);
+    ds.setSubmissions([]);
+    ds.setRevisions([]);
+    ds.setNotifications([]);
+    ds.setLogs([]);
+    ds.setBackups([]);
+    ds.setProjects([]);
   },
 
   me() {

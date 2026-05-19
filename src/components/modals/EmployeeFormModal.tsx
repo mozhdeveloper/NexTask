@@ -92,6 +92,7 @@ export function EmployeeFormModal({
 
   // Sync form values whenever the modal opens or the editing target changes.
   useEffect(() => {
+    if (!open) return;
     if (editing) {
       reset({
         name: editing.name,
@@ -112,7 +113,7 @@ export function EmployeeFormModal({
       setShowPwd(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing]);
+  }, [open, editing?.id]);
 
   const onGenerate = () => {
     const pwd = generatePassword();
