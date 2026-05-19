@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { Label } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useAuth, useRequireRole } from "@/hooks/useAuth";
@@ -15,7 +15,7 @@ import { SubmitWorkModal } from "@/components/modals/SubmitWorkModal";
 import { submissionService } from "@/services/submission.service";
 import { toast } from "sonner";
 import {
-  Play, CheckCircle2, Clock3, RotateCcw, Lock, Pencil, AlertCircle,
+  Play, CheckCircle2, Clock3, RotateCcw, Pencil, AlertCircle,
   CalendarDays, FileCheck2, ArrowUpRight, Timer, FileText, UploadCloud,
 } from "lucide-react";
 import { workSettingsService } from "@/services/workSettings.service";
@@ -83,12 +83,10 @@ export default function MyWorkPage() {
 
   const elapsed =
     todaySub?.startedAt
-      ? formatElapsed(
+      ? (void tick, formatElapsed(
           new Date(todaySub.startedAt),
           todaySub.submittedAt ? new Date(todaySub.submittedAt) : new Date(),
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          tick,
-        )
+        ))
       : null;
 
   const handleStart = async () => {
@@ -554,7 +552,7 @@ function WeekRow({
   );
 }
 
-function formatElapsed(start: Date, end: Date, _tick?: number): string {
+function formatElapsed(start: Date, end: Date): string {
   const ms = Math.max(0, end.getTime() - start.getTime());
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);

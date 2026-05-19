@@ -1,8 +1,7 @@
 ﻿"use client";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  ChevronLeft, ChevronRight, Plus,
+  ChevronLeft, ChevronRight,
   CalendarDays, LayoutGrid, List, FileText, Filter,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +23,6 @@ import {
   parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
-import { StatusPill } from "@/components/ui/status-pill";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
 import { DayDetailModal } from "@/components/modals/DayDetailModal";
 import { STATUS_META } from "@/lib/status";
@@ -200,7 +198,6 @@ function Legend() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const router = useRouter();
   const user = useAuth();
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
@@ -216,8 +213,6 @@ export default function CalendarPage() {
   const [listGrouping, setListGrouping] = useState<ListGrouping>("month");
   const [filterStatus, setFilterStatus] = useState<SubmissionStatus | "all">("all");
 
-  if (!user) return null;
-
   // ── employee pool ─────────────────────────────────────────────────────────
   // All active employees (no managers/admins) used for count badges.
   const allActiveEmployees = useMemo(
@@ -227,11 +222,11 @@ export default function CalendarPage() {
 
   // Role-scoped employee list shown in the DayDetailModal.
   const scopedEmployees = useMemo(() => {
-    if (user.role === "manager") {
+    if (user?.role === "manager") {
       return allActiveEmployees.filter((u) => u.departmentId === user.departmentId);
     }
     return allActiveEmployees;
-  }, [user.role, user.departmentId, allActiveEmployees]);
+  }, [user?.role, user?.departmentId, allActiveEmployees]);
 
   // Per-day submitted count (across ALL active employees, regardless of viewer scope).
   const dayCountMap = useMemo(() => {
@@ -246,19 +241,19 @@ export default function CalendarPage() {
     return m;
   }, [submissions, allActiveEmployees]);
 
-  const canSelect = user.role === "admin" || user.role === "manager";
-  const canOverride = user.role === "admin" || user.role === "manager";
+  const canSelect = user?.role === "admin" || user?.role === "manager";
+  const canOverride = user?.role === "admin" || user?.role === "manager";
   // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
   const pickedUserInScope = (() => {
-    if (!viewUserId) return false;
+    if (!user || !viewUserId) return false;
     const target = users.find((u) => u.id === viewUserId);
     if (!target) return false;
     if (user.role === "manager" && target.departmentId !== user.departmentId) return false;
     return true;
   })();
-  const effectiveId = canSelect && pickedUserInScope ? viewUserId! : user.id;
+  const effectiveId = canSelect && pickedUserInScope ? viewUserId! : (user?.id ?? "");
   const effectiveUser = users.find((u) => u.id === effectiveId) ?? user;
-  const isSelf = effectiveId === user.id;
+  const isSelf = effectiveId === user?.id;
   const today = new Date();
 
   // ── day map (filter-aware) ────────────────────────────────────────────────
@@ -271,7 +266,6 @@ export default function CalendarPage() {
     return m;
   }, [effectiveId, submissions, filterStatus]);
 
-  const pickedSub = picked ? dayMap.get(format(picked, "yyyy-MM-dd")) : undefined;
 
   // ── navigation ────────────────────────────────────────────────────────────
   const goBack = () => view === "week" ? setCursor(subWeeks(cursor, 1)) : setCursor(subMonths(cursor, 1));
@@ -313,13 +307,15 @@ export default function CalendarPage() {
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [submissions, effectiveId, filterStatus, listGrouping]);
 
+  if (!user || !effectiveUser) return null;
+
   // ── period label ──────────────────────────────────────────────────────────
   const periodLabel = view === "week"
     ? `${format(startOfWeek(cursor), "MMM d")} – ${format(endOfWeek(cursor), "MMM d, yyyy")}`
     : format(cursor, "MMMM yyyy");
 
   // ── cell handler ──────────────────────────────────────────────────────────
-  const handleSelect = (d: Date, _sub?: Submission) => {
+  const handleSelect = (d: Date) => {
     setPicked(d);
     if (view === "month") setCursor(d);
     // Always open the day detail modal on click (all roles)

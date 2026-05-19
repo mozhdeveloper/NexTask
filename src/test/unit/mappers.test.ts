@@ -7,7 +7,6 @@ import {
   mapDepartment,
   mapSubmissionType,
   mapSubmission,
-  mapAttachment,
   mapRevision,
   mapActivityLog,
   mapBackupLog,

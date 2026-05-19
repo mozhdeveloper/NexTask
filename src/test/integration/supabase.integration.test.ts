@@ -10,7 +10,18 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = "https://wydphvbdyyxryxeqdbxk.supabase.co";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
 
-const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+// When the service-role key is not provided (typical local dev), skip the
+// entire integration suite instead of failing the run. CI sets the env var.
+const describeIntegration = SERVICE_ROLE_KEY ? describe : describe.skip;
+
+if (!SERVICE_ROLE_KEY) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[integration] SUPABASE_SERVICE_ROLE_KEY not set — skipping Supabase integration suite."
+  );
+}
+
+const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || "anon-placeholder");
 
 // ─── Test data registry — collected for cleanup ───────────────────────────────
 const cleanup: Record<string, string[]> = {
@@ -41,7 +52,7 @@ afterAll(async () => {
 });
 
 // ─── 1. TABLE EXISTENCE & ROW COUNTS ─────────────────────────────────────────
-describe("Schema — table existence and seed counts", () => {
+describeIntegration("Schema — table existence and seed counts", () => {
   const tables = [
     ["users", 17],
     ["departments", 6],
@@ -64,7 +75,7 @@ describe("Schema — table existence and seed counts", () => {
 });
 
 // ─── 2. ENUM CORRECTNESS ──────────────────────────────────────────────────────
-describe("Schema — submission status enum values", () => {
+describeIntegration("Schema — submission status enum values", () => {
   const validStatuses = new Set([
     "pending", "submitted", "late", "missing",
     "revision_requested", "revision_approved", "revision_rejected", "locked",
@@ -79,7 +90,7 @@ describe("Schema — submission status enum values", () => {
 });
 
 // ─── 3. WORK SETTINGS SINGLETON ───────────────────────────────────────────────
-describe("Schema — work_settings singleton", () => {
+describeIntegration("Schema — work_settings singleton", () => {
   it("should have exactly one row", async () => {
     const { count } = await sb.from("work_settings").select("*", { count: "exact", head: true });
     expect(count).toBe(1);
@@ -98,7 +109,7 @@ describe("Schema — work_settings singleton", () => {
 });
 
 // ─── 4. VIEW: view_submission_with_user ───────────────────────────────────────
-describe("View — view_submission_with_user", () => {
+describeIntegration("View — view_submission_with_user", () => {
   it("should return rows with user_name populated", async () => {
     const { data, error } = await sb
       .from("view_submission_with_user")
@@ -131,7 +142,7 @@ describe("View — view_submission_with_user", () => {
 });
 
 // ─── 5. RPC: rpc_count_working_days ──────────────────────────────────────────
-describe("RPC — rpc_count_working_days", () => {
+describeIntegration("RPC — rpc_count_working_days", () => {
   it("should return 5 for a Mon-Fri week with no holidays", async () => {
     const { data, error } = await sb.rpc("rpc_count_working_days", {
       p_from: "2026-05-18", // Mon
@@ -185,7 +196,7 @@ describe("RPC — rpc_count_working_days", () => {
 });
 
 // ─── 6. RPC: rpc_today_stats ──────────────────────────────────────────────────
-describe("RPC — rpc_today_stats", () => {
+describeIntegration("RPC — rpc_today_stats", () => {
   let adminId: string;
 
   beforeAll(async () => {
@@ -217,7 +228,7 @@ describe("RPC — rpc_today_stats", () => {
 });
 
 // ─── 7. RPC: rpc_unread_notification_count ───────────────────────────────────
-describe("RPC — rpc_unread_notification_count", () => {
+describeIntegration("RPC — rpc_unread_notification_count", () => {
   it("should return a non-negative integer for any user", async () => {
     const { data, error } = await sb.rpc("rpc_unread_notification_count", {
       p_user_id: "u_nobody_it",
@@ -254,7 +265,7 @@ describe("RPC — rpc_unread_notification_count", () => {
 });
 
 // ─── 8. TRIGGER: trim_activity_logs (keeps ≤ 1000) ───────────────────────────
-describe("Trigger — trim_activity_logs should cap logs at 1000", () => {
+describeIntegration("Trigger — trim_activity_logs should cap logs at 1000", () => {
   it("should have at most 1000 rows after bulk insert", async () => {
     // Get current count; if already close to 1000 this test is a no-op
     const { count: before } = await sb
@@ -281,7 +292,7 @@ describe("Trigger — trim_activity_logs should cap logs at 1000", () => {
 });
 
 // ─── 9. TRIGGER: updated_at on work_settings ──────────────────────────────────
-describe("Trigger — updated_at should auto-update on work_settings change", () => {
+describeIntegration("Trigger — updated_at should auto-update on work_settings change", () => {
   it("should update the updated_at timestamp on any modification", async () => {
     const { data: before } = await sb.from("work_settings").select("updated_at").single();
     const tsBefore = before?.updated_at;
@@ -300,7 +311,7 @@ describe("Trigger — updated_at should auto-update on work_settings change", ()
 });
 
 // ─── 10. CRUD ROUND-TRIP: notifications ───────────────────────────────────────
-describe("CRUD — notifications round-trip", () => {
+describeIntegration("CRUD — notifications round-trip", () => {
   it("should insert, read, update (mark read), then delete a notification", async () => {
     const { data: users } = await sb.from("users").select("id").limit(1);
     const uid = users?.[0]?.id ?? "u_test";
@@ -340,7 +351,7 @@ describe("CRUD — notifications round-trip", () => {
 });
 
 // ─── 11. STORAGE BUCKET ───────────────────────────────────────────────────────
-describe("Storage — submissions bucket", () => {
+describeIntegration("Storage — submissions bucket", () => {
   it("should have a private bucket named 'submissions'", async () => {
     const { data: buckets } = await sb.storage.listBuckets();
     const bucket = buckets?.find((b) => b.id === "submissions");
@@ -350,7 +361,7 @@ describe("Storage — submissions bucket", () => {
 });
 
 // ─── 12. USER ROLES ───────────────────────────────────────────────────────────
-describe("Schema — user roles", () => {
+describeIntegration("Schema — user roles", () => {
   it("should have at least 1 admin user", async () => {
     const { count } = await sb.from("users").select("*", { count: "exact", head: true }).eq("role", "admin");
     expect(count).toBeGreaterThanOrEqual(1);
@@ -375,7 +386,7 @@ describe("Schema — user roles", () => {
 });
 
 // ─── 13. FOREIGN KEY INTEGRITY ────────────────────────────────────────────────
-describe("Foreign key integrity", () => {
+describeIntegration("Foreign key integrity", () => {
   it("all submission user_ids should reference existing users", async () => {
     const { data: userIds } = await sb.from("users").select("id");
     const { data: subs } = await sb.from("submissions").select("user_id").limit(300);
@@ -394,7 +405,7 @@ describe("Foreign key integrity", () => {
 });
 
 // ─── 14. ACTIVITY LOG AUDIT COMPLETENESS ─────────────────────────────────────
-describe("Activity logs — audit trail", () => {
+describeIntegration("Activity logs — audit trail", () => {
   it("should accept log entries with all required fields", async () => {
     const id = `it_log_audit_${Date.now()}`;
     const { error } = await sb.from("activity_logs").insert({

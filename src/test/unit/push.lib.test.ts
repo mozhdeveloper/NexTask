@@ -1,6 +1,6 @@
 // Unit tests for src/lib/push.ts — VAPID key encoding helpers + feature detection.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { urlBase64ToUint8Array, isPushSupported } from "@/lib/push";
 
 describe("urlBase64ToUint8Array", () => {

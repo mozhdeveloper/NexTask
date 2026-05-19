@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { useDataStore } from "@/store/dataStore";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, useRequireRole } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { workSettingsService } from "@/services/workSettings.service";
@@ -112,6 +112,7 @@ function ImportRow({
 }
 
 export default function SettingsPage() {
+  const { ready } = useRequireRole(["admin", "manager"]);
   const reset = useDataStore((s) => s.reset);
   const router = useRouter();
   const user = useAuth();
@@ -225,6 +226,8 @@ export default function SettingsPage() {
     });
     return map;
   }, [workSettings.holidays]);
+
+  if (!ready || !user) return null;
 
   return (
     <div className="space-y-6">

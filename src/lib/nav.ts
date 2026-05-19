@@ -32,7 +32,6 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Projects", href: "/projects", icon: FolderKanban },
     { label: "Notifications", href: "/notifications", icon: Bell },
     { label: "Profile", href: "/profile", icon: UserIcon },
-    { label: "Settings", href: "/settings", icon: Settings },
   ],
   manager: [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
