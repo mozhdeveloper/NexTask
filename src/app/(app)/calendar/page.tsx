@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { StatusPill } from "@/components/ui/status-pill";
 import { SubmissionDetailsModal } from "@/components/modals/SubmissionDetailsModal";
+import { DayDetailModal } from "@/components/modals/DayDetailModal";
 import { STATUS_META } from "@/lib/status";
 import { workSettingsService } from "@/services/workSettings.service";
 import type { Submission } from "@/types";
@@ -78,6 +79,7 @@ const STATUS_FILTER_OPTIONS: { value: SubmissionStatus | "all"; label: string }[
 // ─── DayCell ─────────────────────────────────────────────────────────────────
 function DayCell({
   d, sub, inMonth, isToday, isPicked, compact, onSelect,
+  submittedCount, totalCount,
 }: {
   d: Date;
   sub?: Submission;
@@ -86,6 +88,8 @@ function DayCell({
   isPicked: boolean;
   compact?: boolean;
   onSelect: (d: Date, sub?: Submission) => void;
+  submittedCount?: number;
+  totalCount?: number;
 }) {
   const iso = format(d, "yyyy-MM-dd");
   const holiday = workSettingsService.isHoliday(iso);
@@ -148,6 +152,21 @@ function DayCell({
         </p>
       )}
 
+      {/* Submitted / total count badge */}
+      {inMonth && typeof submittedCount === "number" && typeof totalCount === "number" && (
+        <span className={cn(
+          "mt-auto inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-none",
+          compact ? "hidden sm:inline-flex" : "inline-flex",
+          submittedCount === totalCount && totalCount > 0
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : submittedCount > 0
+              ? "border-amber-200 bg-amber-50 text-amber-700"
+              : "border-surface-border bg-surface-subtle text-ink-soft"
+        )}>
+          {submittedCount}/{totalCount}
+        </span>
+      )}
+
       {/* Holiday / non-working badge (full cells, no submission) */}
       {!sub && inMonth && holiday && !compact && (
         <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
@@ -187,11 +206,41 @@ export default function CalendarPage() {
   const [cursor, setCursor] = useState(new Date());
   const [picked, setPicked] = useState<Date | null>(new Date());
   const [modal, setModal] = useState<Submission | null>(null);
+  const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
+  const [dayModalOpen, setDayModalOpen] = useState(false);
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
   const [filterStatus, setFilterStatus] = useState<SubmissionStatus | "all">("all");
 
   if (!user) return null;
+
+  // ── employee pool ─────────────────────────────────────────────────────────
+  // All active employees (no managers/admins) used for count badges.
+  const allActiveEmployees = useMemo(
+    () => users.filter((u) => u.isActive && u.role === "employee"),
+    [users]
+  );
+
+  // Role-scoped employee list shown in the DayDetailModal.
+  const scopedEmployees = useMemo(() => {
+    if (user.role === "manager") {
+      return allActiveEmployees.filter((u) => u.departmentId === user.departmentId);
+    }
+    return allActiveEmployees;
+  }, [user.role, user.departmentId, allActiveEmployees]);
+
+  // Per-day submitted count (across ALL active employees, regardless of viewer scope).
+  const dayCountMap = useMemo(() => {
+    const m = new Map<string, number>();
+    const employeeIds = new Set(allActiveEmployees.map((u) => u.id));
+    submissions
+      .filter((s) => employeeIds.has(s.userId))
+      .forEach((s) => {
+        const prev = m.get(s.date) ?? 0;
+        m.set(s.date, prev + 1);
+      });
+    return m;
+  }, [submissions, allActiveEmployees]);
 
   const canSelect = user.role === "admin" || user.role === "manager";
   // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
@@ -249,10 +298,12 @@ export default function CalendarPage() {
     : format(cursor, "MMMM yyyy");
 
   // ── cell handler ──────────────────────────────────────────────────────────
-  const handleSelect = (d: Date, sub?: Submission) => {
+  const handleSelect = (d: Date, _sub?: Submission) => {
     setPicked(d);
-    if (view === "month") setCursor(d); // keep cursor in sync
-    if (sub) setModal(sub); // single-click to view details when a submission exists
+    if (view === "month") setCursor(d);
+    // Always open the day detail modal on click (all roles)
+    setDayModalDate(d);
+    setDayModalOpen(true);
   };
 
   return (
@@ -384,6 +435,8 @@ export default function CalendarPage() {
                     isPicked={!!picked && isSameDay(d, picked)}
                     compact
                     onSelect={handleSelect}
+                    submittedCount={isSameMonth(d, cursor) ? (dayCountMap.get(iso) ?? 0) : undefined}
+                    totalCount={isSameMonth(d, cursor) ? allActiveEmployees.length : undefined}
                   />
                 );
               })}
@@ -427,6 +480,8 @@ export default function CalendarPage() {
                       isPicked={!!picked && isSameDay(d, picked)}
                       compact={false}
                       onSelect={handleSelect}
+                      submittedCount={dayCountMap.get(iso) ?? 0}
+                      totalCount={allActiveEmployees.length}
                     />
                   </div>
                 );
@@ -517,59 +572,19 @@ export default function CalendarPage() {
         </Card>
       )}
 
-      {/* ── SELECTED DAY DETAIL (month + week) ────────────────────────────── */}
-      {picked && view !== "list" && (
-        <Card>
-          <CardContent className="px-4 py-4 sm:px-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                  {format(picked, "EEEE")}
-                </p>
-                <h2 className="text-lg font-semibold text-ink">
-                  {format(picked, "MMMM d, yyyy")}
-                </h2>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {pickedSub && <StatusPill status={pickedSub.status} />}
-                {pickedSub ? (
-                  <Button size="sm" variant="outline" onClick={() => setModal(pickedSub)}>
-                    View details
-                  </Button>
-                ) : isSelf && !isAfter(picked, today) ? (
-                  <Button
-                    size="sm"
-                    onClick={() => router.push(`/my-work?date=${format(picked, "yyyy-MM-dd")}`)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Submit work
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-
-            {pickedSub ? (
-              <div className="mt-3 space-y-2">
-                {pickedSub.workSummary && (
-                  <p className="text-sm font-medium text-ink">{pickedSub.workSummary}</p>
-                )}
-                {pickedSub.tasksDetails && (
-                  <p className="whitespace-pre-wrap rounded-lg bg-surface-subtle px-3 py-2.5 text-sm leading-relaxed text-ink-muted">
-                    {pickedSub.tasksDetails}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm text-ink-muted">No submission recorded for this date.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       <SubmissionDetailsModal
         open={!!modal}
         onOpenChange={(v) => !v && setModal(null)}
         submission={modal}
+      />
+
+      <DayDetailModal
+        open={dayModalOpen}
+        onOpenChange={setDayModalOpen}
+        date={dayModalDate}
+        scopedEmployees={scopedEmployees}
+        submissions={submissions}
+        totalEmployees={allActiveEmployees.length}
       />
     </div>
   );
