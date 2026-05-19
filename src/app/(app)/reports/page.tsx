@@ -1,8 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays, Clock, AlertTriangle, UserCheck, Building2, Database,
   Download, FileSpreadsheet, FileText, FileType2, Eye, Sparkles,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -48,7 +49,7 @@ const SCOPE_OPTIONS: { value: ScopeKind; label: string }[] = [
   { value: "range",  label: "Custom range" },
 ];
 
-const PREVIEW_LIMIT = 25;
+const ITEMS_PER_PAGE = 15;
 
 export default function ReportsPage() {
   const { ready } = useRequireRole(["admin", "manager"]);
@@ -67,6 +68,7 @@ export default function ReportsPage() {
   const [rangeEnd, setRangeEnd] = useState<string>(todayISO());
   const [format, setFormat] = useState<ExportFormat>("csv");
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(1);
 
   const scope = useMemo<ReportScope>(() => {
     if (scopeKind === "today") return { kind: "today" };
@@ -81,19 +83,17 @@ export default function ReportsPage() {
     [ready, type, scope, submissions, users, departments, backups],
   );
 
-  // Per-card live counts for the current scope.
-  const cardCounts = useMemo(() => {
-    if (!ready) return {} as Record<ReportType, number>;
-    return Object.fromEntries(
-      REPORTS.map((r) => [r.type, reportService.preview(r.type, scope).length]),
-    ) as Record<ReportType, number>;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, scope, submissions, users, departments, backups]);
+  // Reset to page 1 whenever the report type or scope changes.
+  useEffect(() => { setPage(1); }, [type, scopeKind, anchor, rangeStart, rangeEnd]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / ITEMS_PER_PAGE));
+  // Clamp in case rows shrink below current page.
+  const safePage = Math.min(page, totalPages);
+  const preview = rows.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
   const range = useMemo(() => reportService.resolveRange(scope), [scope]);
   const meta = REPORTS.find((r) => r.type === type)!;
   const headers = rows[0] ? Object.keys(rows[0]) : [];
-  const preview = rows.slice(0, PREVIEW_LIMIT);
 
   const handleExport = async () => {
     setBusy(true);
@@ -139,14 +139,9 @@ export default function ReportsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold text-ink">{r.title}</div>
-                    {typeof cardCounts[r.type] === "number" && (
-                      <span className={cn(
-                        "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none",
-                        active
-                          ? "border-primary/30 bg-primary/10 text-primary"
-                          : "border-surface-border bg-surface-subtle text-ink-muted",
-                      )}>
-                        {cardCounts[r.type]}
+                    {active && rows.length > 0 && (
+                      <span className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary">
+                        {rows.length}
                       </span>
                     )}
                   </div>
@@ -285,8 +280,10 @@ export default function ReportsPage() {
             <div>
               <CardTitle>Preview</CardTitle>
               <CardDescription>
-                Showing {Math.min(PREVIEW_LIMIT, rows.length)} of {rows.length} row{rows.length === 1 ? "" : "s"}.
-                Full data is included in the export.
+                {rows.length === 0
+                  ? "No data in the selected range."
+                  : `Showing ${(safePage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(safePage * ITEMS_PER_PAGE, rows.length)} of ${rows.length} row${rows.length === 1 ? "" : "s"}.`
+                }
               </CardDescription>
             </div>
           </div>
@@ -318,10 +315,25 @@ export default function ReportsPage() {
                   ))}
                 </TBody>
               </Table>
-              {rows.length > PREVIEW_LIMIT && (
-                <p className="mt-3 text-xs text-ink-soft">
-                  + {rows.length - PREVIEW_LIMIT} more row{rows.length - PREVIEW_LIMIT === 1 ? "" : "s"} in the export.
-                </p>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-surface-border pt-3 mt-2">
+                  <span className="text-xs text-ink-soft">
+                    {rows.length} total rows &middot; {ITEMS_PER_PAGE} per page
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" disabled={safePage <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <span className="min-w-[5rem] text-center text-xs text-ink-muted">
+                      Page {safePage} / {totalPages}
+                    </span>
+                    <Button size="sm" variant="outline" disabled={safePage >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           )}

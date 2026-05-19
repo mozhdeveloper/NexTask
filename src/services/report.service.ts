@@ -145,12 +145,14 @@ function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unk
       const activeWorkers = users.filter(
         (u) => u.isActive && (u.role === "employee" || u.role === "manager"),
       );
+      // Pre-built Set for O(1) lookup — avoids O(submissions) scan per worker-day.
+      const submittedSet = new Set(submissions.map((s) => `${s.userId}|${s.date}`));
       const today = todayISO();
       const cap = end < today ? end : today;
       for (let d = start; d <= cap; d = addDays(d, 1)) {
         if (!workSettingsService.isWorkingDay(d)) continue;
         for (const u of activeWorkers) {
-          if (submissions.some((s) => s.userId === u.id && s.date === d)) continue;
+          if (submittedSet.has(`${u.id}|${d}`)) continue;
           if (d === today && !workSettingsService.isPastWorkEnd()) continue;
           virtual.push({
             Date: d,
