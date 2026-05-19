@@ -70,4 +70,35 @@ export const backupService = {
     const mapped: BackupLog[] = (data ?? []).map((r) => mapBackupLog(r as DbBackupLogRow));
     useDataStore.getState().setBackups(mapped);
   },
+
+  async sendByEmail(email: string, backupId?: string) {
+    const me = useAuthStore.getState().user;
+    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error("Invalid email address");
+    }
+    const res = await fetch("/api/backups/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, backupId: backupId ?? null }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body?.error ?? "Failed to send backup email");
+    }
+    logService.append({
+      userId: me.id,
+      action: "backup.email",
+      targetType: "backup",
+      targetId: backupId ?? null,
+    });
+    return body as {
+      ok: true;
+      messageId: string | null;
+      email: string;
+      fileName: string;
+      sizeBytes: number;
+      counts: Record<string, number>;
+    };
+  },
 };

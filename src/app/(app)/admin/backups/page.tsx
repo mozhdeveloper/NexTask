@@ -16,6 +16,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { fmtBytes, fmtDate } from "@/lib/dates";
 import { RunBackupModal } from "@/components/modals/RunBackupModal";
+import { SendBackupEmailModal } from "@/components/modals/SendBackupEmailModal";
 import { useRequireRole } from "@/hooks/useAuth";
 import { StatCard } from "@/components/cards/StatCard";
 import { downloadBlob } from "@/lib/helpers";
@@ -43,6 +44,8 @@ export default function BackupsPage() {
   const backups = useDataStore((s) => s.backups);
   const abs = useDataStore((s) => s.autoBackupSettings);
   const [open, setOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendTarget, setSendTarget] = useState<{ id?: string; fileName?: string }>({});
 
   const [abEnabled, setAbEnabled] = useState(() => abs.enabled);
   const [abTime, setAbTime] = useState(() => abs.time || "22:00");
@@ -65,9 +68,17 @@ export default function BackupsPage() {
         title="Backups"
         description="Configure scheduled backups and review the backup history."
         actions={
-          <Button onClick={() => setOpen(true)}>
-            <Play className="h-4 w-4" /> Run backup now
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => { setSendTarget({ id: last?.id, fileName: last?.fileName }); setSendOpen(true); }}
+            >
+              <Mail className="h-4 w-4" /> Email backup
+            </Button>
+            <Button onClick={() => setOpen(true)}>
+              <Play className="h-4 w-4" /> Run backup now
+            </Button>
+          </div>
         }
       />
 
@@ -240,19 +251,30 @@ export default function BackupsPage() {
                     </TD>
                     <TD>
                       {b.status === "completed" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            downloadBlob(
-                              b.fileName,
-                              `Backup simulation\nFile: ${b.fileName}\nSize: ${fmtBytes(b.sizeBytes)}\nCreated: ${b.createdAt}`,
-                              "text/plain",
-                            )
-                          }
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Email this backup"
+                            onClick={() => { setSendTarget({ id: b.id, fileName: b.fileName }); setSendOpen(true); }}
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Download"
+                            onClick={() =>
+                              downloadBlob(
+                                b.fileName,
+                                `Backup simulation\nFile: ${b.fileName}\nSize: ${fmtBytes(b.sizeBytes)}\nCreated: ${b.createdAt}`,
+                                "text/plain",
+                              )
+                            }
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </TD>
                   </TR>
@@ -270,6 +292,12 @@ export default function BackupsPage() {
       </Card>
 
       <RunBackupModal open={open} onOpenChange={setOpen} />
+      <SendBackupEmailModal
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        backupId={sendTarget.id}
+        fileName={sendTarget.fileName}
+      />
     </div>
   );
 }

@@ -138,7 +138,7 @@ export default function AdminDashboard() {
     toast.success(`Reminders sent to ${overdueCells.length} employee(s).`);
   };
   const downloadReport = () => {
-    reportService.export("daily", "csv");
+    void reportService.export("daily", { kind: "today" }, "csv");
     toast.success("Daily report downloaded.");
   };
 
