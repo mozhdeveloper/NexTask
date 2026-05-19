@@ -20,7 +20,8 @@ import {
   startOfWeek, endOfWeek,
   eachDayOfInterval,
   isSameMonth, isSameDay,
-  isAfter,
+  isWithinInterval,
+  parseISO,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -33,6 +34,7 @@ import type { SubmissionStatus } from "@/lib/constants";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 type CalView = "month" | "week" | "list";
+type ListGrouping = "day" | "week" | "month";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const STATUS_DOT: Record<SubmissionStatus, string> = {
@@ -202,6 +204,7 @@ export default function CalendarPage() {
   const user = useAuth();
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
+  const departments = useDataStore((s) => s.departments);
 
   const [cursor, setCursor] = useState(new Date());
   const [picked, setPicked] = useState<Date | null>(new Date());
@@ -210,6 +213,7 @@ export default function CalendarPage() {
   const [dayModalOpen, setDayModalOpen] = useState(false);
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
+  const [listGrouping, setListGrouping] = useState<ListGrouping>("month");
   const [filterStatus, setFilterStatus] = useState<SubmissionStatus | "all">("all");
 
   if (!user) return null;
@@ -243,6 +247,7 @@ export default function CalendarPage() {
   }, [submissions, allActiveEmployees]);
 
   const canSelect = user.role === "admin" || user.role === "manager";
+  const canOverride = user.role === "admin" || user.role === "manager";
   // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
   const pickedUserInScope = (() => {
     if (!viewUserId) return false;
@@ -284,13 +289,29 @@ export default function CalendarPage() {
     end: endOfWeek(cursor),
   }), [cursor]);
 
-  const listItems = useMemo(() =>
-    [...submissions]
+  const listItems = useMemo(() => {
+    const today = new Date();
+    let intervalStart: Date;
+    let intervalEnd: Date;
+    if (listGrouping === "day") {
+      intervalStart = new Date(today); intervalStart.setHours(0,0,0,0);
+      intervalEnd   = new Date(today); intervalEnd.setHours(23,59,59,999);
+    } else if (listGrouping === "week") {
+      intervalStart = startOfWeek(today);
+      intervalEnd   = endOfWeek(today);
+    } else {
+      intervalStart = startOfMonth(today);
+      intervalEnd   = endOfMonth(today);
+    }
+    return [...submissions]
       .filter((s) => s.userId === effectiveId)
       .filter((s) => filterStatus === "all" || s.status === filterStatus)
-      .sort((a, b) => b.date.localeCompare(a.date)),
-    [submissions, effectiveId, filterStatus]
-  );
+      .filter((s) => {
+        const d = parseISO(s.date);
+        return isWithinInterval(d, { start: intervalStart, end: intervalEnd });
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [submissions, effectiveId, filterStatus, listGrouping]);
 
   // ── period label ──────────────────────────────────────────────────────────
   const periodLabel = view === "week"
@@ -354,7 +375,25 @@ export default function CalendarPage() {
             </Button>
           </div>
         ) : (
-          <div className="text-sm font-semibold text-ink">All Submissions</div>
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-semibold text-ink">
+              {listGrouping === "day" ? "Today" : listGrouping === "week" ? "This week" : "This month"}
+            </div>
+            <div className="ml-auto flex items-center rounded-lg border border-surface-border bg-white p-0.5 gap-0.5">
+              {(["day", "week", "month"] as ListGrouping[]).map((g) => (
+                <button key={g}
+                  onClick={() => setListGrouping(g)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors capitalize",
+                    listGrouping === g
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+                  )}>
+                  {g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* View switcher */}
@@ -507,67 +546,85 @@ export default function CalendarPage() {
               </p>
             </CardContent>
           ) : (
-            <ul className="divide-y divide-surface-border">
-              {listItems.map((s) => {
-                const isT = isSameDay(new Date(s.date), today);
-                return (
-                  <li
-                    key={s.id}
-                    className="flex items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-subtle/60 sm:px-5"
-                  >
-                    {/* Date badge */}
-                    <div className="w-12 flex-shrink-0 text-center">
-                      <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
-                        {format(new Date(s.date), "MMM")}
+            (() => {
+              // Group items by date for daily/weekly; by week-of-month for monthly
+              const groups = new Map<string, Submission[]>();
+              listItems.forEach((s) => {
+                const key = listGrouping === "month"
+                  ? `Week of ${format(startOfWeek(parseISO(s.date)), "MMM d")}`
+                  : s.date;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key)!.push(s);
+              });
+              return (
+                <div className="divide-y divide-surface-border">
+                  {Array.from(groups.entries()).map(([groupKey, groupSubs]) => (
+                    <div key={groupKey}>
+                      {/* Group header */}
+                      <div className="px-4 py-2 bg-surface-subtle/70 border-b border-surface-border">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                          {listGrouping === "day"
+                            ? format(parseISO(groupKey), "EEEE, MMMM d, yyyy")
+                            : listGrouping === "week"
+                              ? format(parseISO(groupKey), "EEEE, MMMM d")
+                              : groupKey}
+                        </p>
                       </div>
-                      <div className={cn(
-                        "mx-auto mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold",
-                        isT ? "bg-primary text-white" : "bg-surface-subtle text-ink"
-                      )}>
-                        {format(new Date(s.date), "d")}
-                      </div>
-                      <div className="mt-0.5 text-[10px] text-ink-soft">
-                        {format(new Date(s.date), "EEE")}
-                      </div>
+                      <ul className="divide-y divide-surface-border">
+                        {groupSubs.map((s) => {
+                          const isT = isSameDay(parseISO(s.date), new Date());
+                          return (
+                            <li key={s.id}
+                              className="flex items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-subtle/60 sm:px-5">
+                              <div className="w-12 flex-shrink-0 text-center">
+                                <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
+                                  {format(parseISO(s.date), "MMM")}
+                                </div>
+                                <div className={cn(
+                                  "mx-auto mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold",
+                                  isT ? "bg-primary text-white" : "bg-surface-subtle text-ink",
+                                )}>
+                                  {format(parseISO(s.date), "d")}
+                                </div>
+                                <div className="mt-0.5 text-[10px] text-ink-soft">
+                                  {format(parseISO(s.date), "EEE")}
+                                </div>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={cn(
+                                    "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
+                                    STATUS_CHIP[s.status],
+                                  )}>
+                                    <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status])} />
+                                    {STATUS_META[s.status].label}
+                                  </span>
+                                  {s.submittedAt && (
+                                    <span className="text-xs text-ink-soft">
+                                      {format(new Date(s.submittedAt), "h:mm a")}
+                                    </span>
+                                  )}
+                                </div>
+                                {s.workSummary && (
+                                  <p className="mt-1.5 truncate text-sm font-medium text-ink">{s.workSummary}</p>
+                                )}
+                                {s.tasksDetails && (
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{s.tasksDetails}</p>
+                                )}
+                              </div>
+                              <Button size="sm" variant="ghost" className="flex-shrink-0 text-ink-muted hover:text-ink"
+                                onClick={() => setModal(s)}>
+                                View
+                              </Button>
+                            </li>
+                          );
+                        })}
+                      </ul>
                     </div>
-
-                    {/* Content */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
-                          STATUS_CHIP[s.status]
-                        )}>
-                          <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status])} />
-                          {STATUS_META[s.status].label}
-                        </span>
-                        {s.submittedAt && (
-                          <span className="text-xs text-ink-soft">
-                            {format(new Date(s.submittedAt), "h:mm a")}
-                          </span>
-                        )}
-                      </div>
-                      {s.workSummary && (
-                        <p className="mt-1.5 truncate text-sm font-medium text-ink">{s.workSummary}</p>
-                      )}
-                      {s.tasksDetails && (
-                        <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{s.tasksDetails}</p>
-                      )}
-                    </div>
-
-                    {/* View button */}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="flex-shrink-0 text-ink-muted hover:text-ink"
-                      onClick={() => setModal(s)}
-                    >
-                      View
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
+                  ))}
+                </div>
+              );
+            })()
           )}
         </Card>
       )}
@@ -585,6 +642,8 @@ export default function CalendarPage() {
         scopedEmployees={scopedEmployees}
         submissions={submissions}
         totalEmployees={allActiveEmployees.length}
+        canOverride={canOverride}
+        departments={departments}
       />
     </div>
   );
