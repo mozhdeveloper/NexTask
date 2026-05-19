@@ -62,6 +62,7 @@ const ACTION_META: Record<string, ActionMeta> = {
   "settings.working_days_update": { label: "Updated working days",    Icon: Settings,       bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
   "settings.permissions_update":  { label: "Updated permissions",     Icon: ShieldCheck,    bg: "bg-orange-100",  text: "text-orange-600",  badgeVariant: "warning",  group: "settings" },
   "backup.run":                    { label: "Ran backup",              Icon: HardDrive,      bg: "bg-purple-100",  text: "text-purple-600",  badgeVariant: "muted",    group: "backup" },
+  "backup.email":                  { label: "Emailed backup",          Icon: HardDrive,      bg: "bg-purple-100",  text: "text-purple-600",  badgeVariant: "muted",    group: "backup" },
   "report.export":                 { label: "Exported report",         Icon: FileDown,       bg: "bg-slate-100",   text: "text-slate-500",   badgeVariant: "muted",    group: "report" },
   "db.reset":                      { label: "Reset database",          Icon: AlertTriangle,  bg: "bg-rose-100",    text: "text-rose-600",    badgeVariant: "danger",   group: "system" },
   "reminder.send":                 { label: "Sent reminders",          Icon: Bell,           bg: "bg-amber-100",   text: "text-amber-600",   badgeVariant: "warning",  group: "user" },

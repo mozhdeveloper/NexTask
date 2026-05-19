@@ -300,9 +300,9 @@ export const reportService = {
     if (me) {
       logService.append({
         userId: me.id,
-        action: `report.export.${format}`,
+        action: "report.export",
         targetType: "report",
-        targetId: null,
+        targetId: `${type}:${format}`,
       });
     }
   },

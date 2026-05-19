@@ -79,9 +79,17 @@ export const revisionService = {
   async approve(revisionId: string, note?: string) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
-    const { revisions, setRevisions, submissions, setSubmissions } = useDataStore.getState();
+    const { revisions, setRevisions, submissions, setSubmissions, users } = useDataStore.getState();
     const r = revisions.find((x) => x.id === revisionId);
     if (!r) throw new Error("Not found");
+    // Managers may only approve revisions for employees in their own department.
+    if (me.role === "manager") {
+      const sub = submissions.find((s) => s.id === r.submissionId);
+      const owner = users.find((u) => u.id === sub?.userId);
+      if (!owner || owner.departmentId !== me.departmentId) {
+        throw new Error("Managers can only approve revisions for employees in their own department.");
+      }
+    }
 
     const decidedAt = nowISO();
     setRevisions(
@@ -133,9 +141,17 @@ export const revisionService = {
   async reject(revisionId: string, note: string) {
     const me = useAuthStore.getState().user;
     if (!me || (me.role !== "admin" && me.role !== "manager")) throw new Error("Forbidden");
-    const { revisions, setRevisions, submissions, setSubmissions } = useDataStore.getState();
+    const { revisions, setRevisions, submissions, setSubmissions, users } = useDataStore.getState();
     const r = revisions.find((x) => x.id === revisionId);
     if (!r) throw new Error("Not found");
+    // Managers may only reject revisions for employees in their own department.
+    if (me.role === "manager") {
+      const sub = submissions.find((s) => s.id === r.submissionId);
+      const owner = users.find((u) => u.id === sub?.userId);
+      if (!owner || owner.departmentId !== me.departmentId) {
+        throw new Error("Managers can only reject revisions for employees in their own department.");
+      }
+    }
 
     const decidedAt = nowISO();
     setRevisions(

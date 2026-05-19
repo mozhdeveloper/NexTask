@@ -134,8 +134,13 @@ describe("revisionService.approve", () => {
   });
 
   it("allows managers to approve", async () => {
-    authState.user = { id: "u_mgr", name: "Manager", role: "manager" };
+    authState.user = { id: "u_mgr", name: "Manager", role: "manager", departmentId: "dept_dev" };
     await expect(revisionService.approve("rev_1")).resolves.not.toThrow();
+  });
+
+  it("forbids managers from approving revisions outside their department", async () => {
+    authState.user = { id: "u_mgr", name: "Manager", role: "manager", departmentId: "dept_other" };
+    await expect(revisionService.approve("rev_1")).rejects.toThrow(/own department/);
   });
 });
 
@@ -168,5 +173,10 @@ describe("revisionService.reject", () => {
   it("forbids employees from rejecting", async () => {
     authState.user = { id: "u_emp", name: "Emp", role: "employee" };
     await expect(revisionService.reject("rev_1", "no")).rejects.toThrow(/Forbidden/);
+  });
+
+  it("forbids managers from rejecting revisions outside their department", async () => {
+    authState.user = { id: "u_mgr", name: "Manager", role: "manager", departmentId: "dept_other" };
+    await expect(revisionService.reject("rev_1", "no")).rejects.toThrow(/own department/);
   });
 });
