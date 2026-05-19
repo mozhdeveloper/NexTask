@@ -116,7 +116,7 @@ export default function MyWorkPage() {
                     : "Tell us what you're tackling, then click Start to begin tracking time."}
               </CardDescription>
             </div>
-            {started && (
+            {(started || finished) && (
               <div className="flex items-center gap-2">
                 <span
                   className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
@@ -142,7 +142,7 @@ export default function MyWorkPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {!started ? (
+          {!started && !finished ? (
             <div className="grid gap-4 md:grid-cols-[1fr_220px_140px]">
               <div className="space-y-1.5">
                 <Label>What are you working on today?</Label>
@@ -233,13 +233,13 @@ export default function MyWorkPage() {
               {finished ? "Update your submission" : started ? "Finish & submit" : "Submission form"}
             </CardTitle>
             <CardDescription>
-              {started
+              {started || finished
                 ? "Add a summary, attach any deliverables, then submit to mark today complete."
                 : "Start your day first to unlock the submission form."}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {started ? (
+            {started || finished ? (
               <SubmitWorkForm defaultDate={targetDate} />
             ) : (
               <div className="flex flex-col items-center gap-2 py-12 text-center text-ink-muted">

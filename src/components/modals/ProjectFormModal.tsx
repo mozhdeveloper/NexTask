@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -62,7 +62,7 @@ export function ProjectFormModal({
 }) {
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
-  const activeUsers = users.filter((u) => u.isActive);
+  const activeUsers = useMemo(() => users.filter((u) => u.isActive), [users]);
   const [members, setMembers] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -107,7 +107,7 @@ export function ProjectFormModal({
       setMembers([]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing, open]);
+  }, [editing, open, activeUsers]);
 
   const status = watch("status");
 
