@@ -14,6 +14,10 @@ export const maxDuration = 60;
 
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
+// Delivery is permanently locked — matches the manual backup recipient.
+const LOCKED_RECIPIENT = "premium.global.official@gmail.com";
+const LOCKED_FROM = "NexTask Backups <onboarding@resend.dev>";
+
 async function handle(req: Request) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const cronSecret = process.env.CRON_SECRET;
@@ -27,7 +31,7 @@ async function handle(req: Request) {
   // ── Read schedule ─────────────────────────────────────────────────────────
   const { data: ws, error: wsErr } = await supabaseAdmin
     .from("work_settings")
-    .select("auto_backup_enabled, auto_backup_email, auto_backup_time, last_auto_backup_date")
+    .select("auto_backup_enabled, last_auto_backup_date")
     .eq("id", true)
     .maybeSingle();
   if (wsErr) return NextResponse.json({ error: wsErr.message }, { status: 500 });
@@ -36,15 +40,9 @@ async function handle(req: Request) {
   }
 
   const todayISO = new Date().toISOString().slice(0, 10);
+  const now = new Date();
   if (ws.last_auto_backup_date === todayISO) {
     return NextResponse.json({ skipped: true, reason: "already_ran_today" });
-  }
-  const [hh, mm] = ((ws.auto_backup_time as string | null) || "22:00").split(":").map(Number);
-  const now = new Date();
-  const scheduledToday = new Date();
-  scheduledToday.setHours(hh, mm, 0, 0);
-  if (now < scheduledToday) {
-    return NextResponse.json({ skipped: true, reason: "not_yet_time" });
   }
 
   // ── Run backup ────────────────────────────────────────────────────────────
@@ -94,13 +92,12 @@ async function handle(req: Request) {
     .eq("id", true);
 
   // ── Email ─────────────────────────────────────────────────────────────────
-  const email = ws.auto_backup_email as string | null;
   let emailResult: { ok: boolean; error?: string } = { ok: true };
-  if (email && process.env.RESEND_API_KEY) {
+  if (process.env.RESEND_API_KEY) {
     try {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromAddr = process.env.RESEND_FROM ?? "NexTask <onboarding@resend.dev>";
+      const fromAddr = LOCKED_FROM;
       const sizeMB = (built.sizeBytes / 1024 / 1024).toFixed(2);
       const zipBuffer = await downloadBackupZip(built.storagePath);
       const tooBig = zipBuffer.length > MAX_ATTACHMENT_BYTES;
@@ -115,7 +112,7 @@ async function handle(req: Request) {
 
       const { error: sendErr } = await resend.emails.send({
         from: fromAddr,
-        to: [email],
+        to: [LOCKED_RECIPIENT],
         subject: `NexTask Auto Backup — ${now.toLocaleDateString()}`,
         html: `
           <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;color:#0f172a">
@@ -151,7 +148,7 @@ async function handle(req: Request) {
     fileName: built.fileName,
     sizeBytes: built.sizeBytes,
     attachmentCount: built.attachmentCount,
-    email,
+    email: LOCKED_RECIPIENT,
     emailResult,
   });
 }

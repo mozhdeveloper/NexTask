@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  Database, Play, Download, Clock, Mail,
+import { Database, Play, Download, Clock, Mail, Lock,
   CheckCircle2, AlertCircle, BellRing, CalendarClock, Shield,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -22,6 +22,7 @@ import { StatCard } from "@/components/cards/StatCard";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { backupService } from "@/services/backup.service";
+import { Input } from "@/components/ui/input";
 
 function fmt12(time: string): string {
   const [h, m] = time.split(":").map(Number);
@@ -48,8 +49,6 @@ export default function BackupsPage() {
   const [sendTarget, setSendTarget] = useState<{ id?: string; fileName?: string }>({});
 
   const [abEnabled, setAbEnabled] = useState(() => abs.enabled);
-  const [abTime, setAbTime] = useState(() => abs.time || "22:00");
-  const [abEmail, setAbEmail] = useState(() => abs.email || "");
   const [dirty, setDirty] = useState(false);
 
   // Live clock for a polished status header.
@@ -71,7 +70,7 @@ export default function BackupsPage() {
   };
 
   const saveAutoBackup = () => {
-    workSettingsService.setAutoBackup({ enabled: abEnabled, time: abTime, email: abEmail });
+    workSettingsService.setAutoBackup({ enabled: abEnabled });
     setDirty(false);
     toast.success("Auto backup settings saved.");
   };
@@ -143,55 +142,31 @@ export default function BackupsPage() {
             </button>
           </div>
 
-          {/* Time + Email — email is always editable (used by auto backup AND manual email button) */}
+          {/* Time + Email — both locked, not user-configurable */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className={cn(
               "space-y-1.5 transition-opacity duration-200",
-              !abEnabled && "pointer-events-none opacity-40",
+              !abEnabled && "opacity-40",
             )}>
-              <Label
-                htmlFor="ab-time"
-                className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted"
-              >
-                <Clock className="h-3.5 w-3.5" /> Daily time
-              </Label>
-              <div className="relative">
-                <Input
-                  id="ab-time"
-                  type="time"
-                  value={abTime}
-                  onChange={(e) => { setAbTime(e.target.value); setDirty(true); }}
-                  className="pr-20"
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary">
-                  {fmt12(abTime)}
-                </span>
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
+                <Clock className="h-3.5 w-3.5" /> Cron schedule
+              </p>
+              <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-subtle/60 px-3 py-2.5">
+                <Lock className="h-4 w-4 flex-shrink-0 text-ink-soft" />
+                <span className="text-sm font-semibold text-ink">10:00 PM UTC</span>
               </div>
-              <p className="text-[11px] text-ink-soft">Default: 10:00 PM — based on your local timezone</p>
+              <p className="text-[11px] text-ink-soft">Locked — runs once daily at 22:00 UTC (Vercel Hobby plan).</p>
             </div>
             <div className="space-y-1.5">
-              <Label
-                htmlFor="ab-email"
-                className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted"
-              >
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted">
                 <Mail className="h-3.5 w-3.5" /> Delivery email
-              </Label>
-              <Input
-                id="ab-email"
-                type="email"
-                placeholder="admin@company.com"
-                value={abEmail}
-                onChange={(e) => { setAbEmail(e.target.value); setDirty(true); }}
-              />
-              <p className="text-[11px] text-ink-soft">
-                Used for auto backup notifications only.
               </p>
-              <p className="flex items-start gap-1.5 text-[11px] text-ink-muted">
-                <Mail className="mt-[2px] h-3 w-3 flex-shrink-0" />
-                <span>
-                  Manual <em>Email backup</em> sends are permanently locked to{" "}
-                  <span className="font-semibold text-ink">premium.global.official@gmail.com</span>.
-                </span>
+              <div className="flex items-center gap-2 rounded-lg border border-surface-border bg-surface-subtle/60 px-3 py-2.5">
+                <Lock className="h-4 w-4 flex-shrink-0 text-ink-soft" />
+                <span className="truncate text-sm font-semibold text-ink">{LOCKED_BACKUP_RECIPIENT}</span>
+              </div>
+              <p className="text-[11px] text-ink-soft">
+                Locked — all backups (auto and manual) deliver to this address.
               </p>
             </div>
           </div>
@@ -208,7 +183,7 @@ export default function BackupsPage() {
                         ? `Last run: ${fmtDate(abs.lastAutoBackupDate)}`
                         : "Enabled — awaiting first run"}
                       <span className="mx-1.5 text-surface-border">·</span>
-                      <span className="font-medium text-ink">Next: {nextScheduledLabel(abs.time)}</span>
+                      <span className="font-medium text-ink">Next: {nextScheduledLabel(LOCKED_BACKUP_TIME)}</span>
                     </span>
                   </>
                 ) : (
@@ -218,17 +193,10 @@ export default function BackupsPage() {
                   </>
                 )}
               </div>
-              {abs.email ? (
-                <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
-                  <Mail className="h-3 w-3 flex-shrink-0" />
-                  <span>Delivery address: <span className="font-semibold text-ink">{abs.email}</span></span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
-                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
-                  <span>No delivery email set — enter one above and save.</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                <Lock className="h-3 w-3 flex-shrink-0" />
+                <span>Delivery address: <span className="font-semibold text-ink">{LOCKED_BACKUP_RECIPIENT}</span></span>
+              </div>
             </div>
             <Button size="sm" onClick={saveAutoBackup} disabled={!dirty}>
               Save settings
