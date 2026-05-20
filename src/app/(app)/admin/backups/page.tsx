@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Database, Play, Download, Clock, Mail,
   CheckCircle2, AlertCircle, BellRing, CalendarClock, Shield,
@@ -19,9 +19,9 @@ import { RunBackupModal } from "@/components/modals/RunBackupModal";
 import { SendBackupEmailModal } from "@/components/modals/SendBackupEmailModal";
 import { useRequireRole } from "@/hooks/useAuth";
 import { StatCard } from "@/components/cards/StatCard";
-import { downloadBlob } from "@/lib/helpers";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { backupService } from "@/services/backup.service";
 
 function fmt12(time: string): string {
   const [h, m] = time.split(":").map(Number);
@@ -52,6 +52,24 @@ export default function BackupsPage() {
   const [abEmail, setAbEmail] = useState(() => abs.email || "");
   const [dirty, setDirty] = useState(false);
 
+  // Live clock for a polished status header.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const handleDownload = async (id: string, fileName: string) => {
+    const tid = toast.loading(`Preparing ${fileName}…`);
+    try {
+      const { url } = await backupService.download(id);
+      toast.success("Download ready", { id: tid });
+      window.open(url, "_blank", "noopener");
+    } catch (e) {
+      toast.error((e as Error).message || "Download failed", { id: tid });
+    }
+  };
+
   const saveAutoBackup = () => {
     workSettingsService.setAutoBackup({ enabled: abEnabled, time: abTime, email: abEmail });
     setDirty(false);
@@ -69,6 +87,10 @@ export default function BackupsPage() {
         description="Configure scheduled backups and review the backup history."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden md:flex items-center gap-2 rounded-lg border border-line bg-surface-alt px-3 py-1.5 text-xs font-medium text-ink-muted">
+              <Clock className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{format(now, "MMM d, yyyy · h:mm:ss a")}</span>
+            </div>
             <Button
               variant="ghost"
               onClick={() => { setSendTarget({ id: last?.id, fileName: last?.fileName }); setSendOpen(true); }}
@@ -279,13 +301,7 @@ export default function BackupsPage() {
                             size="sm"
                             variant="ghost"
                             title="Download"
-                            onClick={() =>
-                              downloadBlob(
-                                b.fileName,
-                                `Backup simulation\nFile: ${b.fileName}\nSize: ${fmtBytes(b.sizeBytes)}\nCreated: ${b.createdAt}`,
-                                "text/plain",
-                              )
-                            }
+                            onClick={() => handleDownload(b.id, b.fileName)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>

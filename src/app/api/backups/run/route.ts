@@ -1,21 +1,14 @@
-// POST /api/backups/run — admin-only. Inserts a backup_logs row, simulates the
-// long-running job, then marks it completed. In production, this would shell out
-// to pg_dump / Supabase Storage export. For now, the row is the record of truth.
+// POST /api/backups/run — admin-only. Builds a real ZIP backup, uploads to
+// Supabase Storage (private "backups" bucket), and records it in backup_logs.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { buildBackupZip } from "@/lib/backup/build";
 import crypto from "node:crypto";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
-
-function backupFileName() {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
-  return `nextask_backup_${stamp}.sql.gz`;
-}
+export const maxDuration = 60;
 
 export async function POST() {
   const sb = createSupabaseServerClient();
@@ -25,25 +18,25 @@ export async function POST() {
   }
   const { data: caller } = await sb
     .from("users")
-    .select("id,role")
+    .select("id,role,name")
     .eq("auth_user_id", auth.user.id)
     .maybeSingle();
   if (!caller || (caller as { role: string }).role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const adminPublicId = (caller as { id: string }).id;
+  const adminName = (caller as { name: string }).name;
 
   const id = `bk_${crypto.randomUUID().slice(0, 8)}`;
-  const fileName = backupFileName();
-  const storagePath = process.env.BACKUP_STORAGE_PATH ?? "./storage/backups";
-  const filePath = `${storagePath}/${fileName}`;
   const startedAt = new Date().toISOString();
+  const today = startedAt.slice(0, 10);
 
+  // Insert "running" row first so the UI has a record even if the build throws.
   const ins = await supabaseAdmin.from("backup_logs").insert({
     id,
     admin_id: adminPublicId,
-    file_name: fileName,
-    file_path: filePath,
+    file_name: "(pending)",
+    file_path: "(pending)",
     size_bytes: 0,
     started_at: startedAt,
     completed_at: null,
@@ -53,25 +46,48 @@ export async function POST() {
     return NextResponse.json({ error: ins.error.message }, { status: 500 });
   }
 
-  // Simulate work (shorter on server than the previous client-side animation)
-  await new Promise((r) => setTimeout(r, 1500));
+  try {
+    const built = await buildBackupZip({
+      triggeredBy: `manual:${adminName}`,
+      attachmentsForDate: today,
+    });
 
-  const sizeBytes = 25_000_000 + Math.floor(Math.random() * 6_000_000);
-  const completedAt = new Date().toISOString();
-  const upd = await supabaseAdmin
-    .from("backup_logs")
-    .update({
-      size_bytes: sizeBytes,
-      completed_at: completedAt,
-      status: "completed",
-    })
-    .eq("id", id)
-    .select("*")
-    .single();
+    const upd = await supabaseAdmin
+      .from("backup_logs")
+      .update({
+        file_name: built.fileName,
+        file_path: built.storagePath,
+        size_bytes: built.sizeBytes,
+        completed_at: new Date().toISOString(),
+        status: "completed",
+      })
+      .eq("id", id)
+      .select("*")
+      .single();
 
-  if (upd.error || !upd.data) {
-    return NextResponse.json({ error: upd.error?.message ?? "Backup finalize failed" }, { status: 500 });
+    if (upd.error || !upd.data) {
+      return NextResponse.json({ error: upd.error?.message ?? "Failed to finalize" }, { status: 500 });
+    }
+    return NextResponse.json(
+      {
+        ...upd.data,
+        _detail: {
+          attachmentCount: built.attachmentCount,
+          attachmentBytes: built.attachmentBytes,
+          rowCounts: built.rowCounts,
+        },
+      },
+      { status: 200 },
+    );
+  } catch (e) {
+    await supabaseAdmin
+      .from("backup_logs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "failed",
+        file_name: `(failed) ${(e as Error).message.slice(0, 80)}`,
+      })
+      .eq("id", id);
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
-
-  return NextResponse.json(upd.data, { status: 200 });
 }

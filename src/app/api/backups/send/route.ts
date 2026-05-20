@@ -1,35 +1,28 @@
 // POST /api/backups/send — admin-only.
-// Builds a JSON snapshot of workspace data and emails it via Resend.
 // Body: { email: string, backupId?: string }
-//   - If backupId is provided, the backup_log id is included for traceability.
-//   - The email contains a JSON attachment with all dynamic tables.
+//
+// Two modes:
+//   1. backupId provided AND that backup has a real storage_path → download
+//      the existing ZIP and email it.
+//   2. No backupId (or storage_path missing) → build a fresh ZIP (with TODAY's
+//      attachments), upload it, log it, and email it.
+//
+// Email cap: Resend allows ~40 MB total. We skip the attachment if the ZIP
+// exceeds 20 MB and include a signed download link instead (24 h expiry).
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { Resend } from "resend";
+import crypto from "node:crypto";
+import { buildBackupZip, downloadBackupZip, signedBackupUrl } from "@/lib/backup/build";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const TABLES = [
-  "users",
-  "departments",
-  "submission_types",
-  "submissions",
-  "attachments",
-  "revisions",
-  "projects",
-  "holidays",
-  "notifications",
-  "activity_logs",
-  "backup_logs",
-  "work_settings",
-] as const;
-
-function isEmail(v: unknown): v is string {
-  return typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-}
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20 MB
+const isEmail = (v: unknown): v is string =>
+  typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 export async function POST(req: Request) {
   const sb = createSupabaseServerClient();
@@ -67,62 +60,128 @@ export async function POST(req: Request) {
     );
   }
 
-  // ─── Build snapshot ──────────────────────────────────────────────────────
-  const snapshot: Record<string, unknown> = {
-    _meta: {
-      generatedAt: new Date().toISOString(),
-      generatedBy: (caller as { name: string }).name,
-      backupId,
-      project: "NexTask",
-    },
-  };
-  const counts: Record<string, number> = {};
-  for (const t of TABLES) {
-    const { data, error } = await supabaseAdmin.from(t).select("*");
-    if (error) {
-      return NextResponse.json(
-        { error: `Failed to read ${t}: ${error.message}` },
-        { status: 500 },
-      );
+  const callerName = (caller as { name: string }).name;
+  const adminPublicId = (caller as { id: string }).id;
+
+  // ── Resolve the backup: download existing or build fresh ──────────────────
+  let fileName: string;
+  let storagePath: string;
+  let zipBuffer: Buffer;
+  let attachmentCount = 0;
+  let rowCounts: Record<string, number> = {};
+
+  if (backupId) {
+    const { data: row, error } = await supabaseAdmin
+      .from("backup_logs")
+      .select("file_name,file_path,size_bytes,status")
+      .eq("id", backupId)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!row) return NextResponse.json({ error: "Backup not found" }, { status: 404 });
+    const r = row as { file_name: string; file_path: string; status: string };
+    if (r.status !== "completed" || !r.file_path || r.file_path === "(pending)") {
+      return NextResponse.json({ error: "Backup is not ready" }, { status: 409 });
     }
-    snapshot[t] = data ?? [];
-    counts[t] = (data ?? []).length;
+    try {
+      zipBuffer = await downloadBackupZip(r.file_path);
+      fileName = r.file_name;
+      storagePath = r.file_path;
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    }
+  } else {
+    const id = `bk_${crypto.randomUUID().slice(0, 8)}`;
+    const startedAt = new Date().toISOString();
+    const today = startedAt.slice(0, 10);
+    await supabaseAdmin.from("backup_logs").insert({
+      id,
+      admin_id: adminPublicId,
+      file_name: "(pending)",
+      file_path: "(pending)",
+      size_bytes: 0,
+      started_at: startedAt,
+      completed_at: null,
+      status: "running",
+    });
+    try {
+      const built = await buildBackupZip({
+        triggeredBy: `email:${callerName}`,
+        attachmentsForDate: today,
+      });
+      zipBuffer = await downloadBackupZip(built.storagePath);
+      fileName = built.fileName;
+      storagePath = built.storagePath;
+      attachmentCount = built.attachmentCount;
+      rowCounts = built.rowCounts;
+      await supabaseAdmin
+        .from("backup_logs")
+        .update({
+          file_name: built.fileName,
+          file_path: built.storagePath,
+          size_bytes: built.sizeBytes,
+          completed_at: new Date().toISOString(),
+          status: "completed",
+        })
+        .eq("id", id);
+    } catch (e) {
+      await supabaseAdmin
+        .from("backup_logs")
+        .update({
+          completed_at: new Date().toISOString(),
+          status: "failed",
+          file_name: `(failed) ${(e as Error).message.slice(0, 80)}`,
+        })
+        .eq("id", id);
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    }
   }
 
-  const json = JSON.stringify(snapshot, null, 2);
-  const fileBase64 = Buffer.from(json, "utf8").toString("base64");
+  // ── Compose email ─────────────────────────────────────────────────────────
   const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-  const fileName = `nextask_backup_${stamp}.json`;
+  const sizeMB = (zipBuffer.length / 1024 / 1024).toFixed(2);
+  const tooBig = zipBuffer.length > MAX_ATTACHMENT_BYTES;
+  let signedUrl: string | null = null;
+  if (tooBig) {
+    try {
+      signedUrl = await signedBackupUrl(storagePath, 24 * 60 * 60);
+    } catch {
+      signedUrl = null;
+    }
+  }
 
-  const sizeKB = (json.length / 1024).toFixed(1);
-  const countsHtml = Object.entries(counts)
-    .map(([t, n]) => `<tr><td style="padding:4px 12px;color:#475569">${t}</td><td style="padding:4px 12px;text-align:right;font-weight:600;color:#0f172a">${n}</td></tr>`)
-    .join("");
+  const downloadBlock = tooBig
+    ? `<p style="margin:0 0 12px;font-size:14px;color:#b45309"><strong>Note:</strong> File is ${sizeMB} MB, too large to attach. Use this download link (expires in 24 h):</p>
+       ${signedUrl ? `<p><a href="${signedUrl}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Download backup</a></p>` : `<p style="color:#dc2626">Sign-link failed — open the Backups page to download directly.</p>`}`
+    : "";
+
+  const countsHtml = Object.keys(rowCounts).length
+    ? `<table style="border-collapse:collapse;width:100%;background:#f8fafc;border-radius:8px;overflow:hidden;font-size:13px;margin-top:12px">
+        <thead><tr style="background:#f1f5f9">
+          <th style="padding:8px 12px;text-align:left;color:#475569;font-weight:600">Table</th>
+          <th style="padding:8px 12px;text-align:right;color:#475569;font-weight:600">Rows</th>
+        </tr></thead>
+        <tbody>${Object.entries(rowCounts)
+          .map(([t, n]) => `<tr><td style="padding:4px 12px;color:#475569">${t}</td><td style="padding:4px 12px;text-align:right;font-weight:600;color:#0f172a">${n}</td></tr>`)
+          .join("")}</tbody>
+       </table>`
+    : "";
 
   const html = `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;color:#0f172a">
       <div style="padding:24px 0;border-bottom:1px solid #e2e8f0">
         <h1 style="margin:0;font-size:20px;color:#0f172a">NexTask Backup</h1>
-        <p style="margin:6px 0 0;color:#64748b;font-size:14px">A workspace data snapshot is attached to this email.</p>
+        <p style="margin:6px 0 0;color:#64748b;font-size:14px">Workspace snapshot ready.</p>
       </div>
       <div style="padding:20px 0">
         <p style="margin:0 0 8px;font-size:14px"><strong>File:</strong> ${fileName}</p>
-        <p style="margin:0 0 8px;font-size:14px"><strong>Size:</strong> ${sizeKB} KB</p>
-        <p style="margin:0 0 16px;font-size:14px"><strong>Generated:</strong> ${now.toLocaleString()}</p>
-        <table style="border-collapse:collapse;width:100%;background:#f8fafc;border-radius:8px;overflow:hidden;font-size:13px">
-          <thead>
-            <tr style="background:#f1f5f9">
-              <th style="padding:8px 12px;text-align:left;color:#475569;font-weight:600">Table</th>
-              <th style="padding:8px 12px;text-align:right;color:#475569;font-weight:600">Rows</th>
-            </tr>
-          </thead>
-          <tbody>${countsHtml}</tbody>
-        </table>
+        <p style="margin:0 0 8px;font-size:14px"><strong>Size:</strong> ${sizeMB} MB</p>
+        <p style="margin:0 0 8px;font-size:14px"><strong>Generated:</strong> ${now.toLocaleString()}</p>
+        ${attachmentCount > 0 ? `<p style="margin:0 0 16px;font-size:14px"><strong>Attachments:</strong> ${attachmentCount} employee submission files for today</p>` : ""}
+        ${downloadBlock}
+        ${countsHtml}
       </div>
       <div style="padding:16px 0;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:12px">
-        Sent by NexTask &middot; ${(caller as { name: string }).name}
+        Sent by NexTask &middot; ${callerName}
       </div>
     </div>
   `;
@@ -133,19 +192,13 @@ export async function POST(req: Request) {
     to: [email],
     subject: `NexTask Backup — ${now.toLocaleDateString()}`,
     html,
-    attachments: [
-      {
-        filename: fileName,
-        content: fileBase64,
-      },
-    ],
+    attachments: tooBig
+      ? []
+      : [{ filename: fileName, content: zipBuffer.toString("base64") }],
   });
 
   if (sendErr) {
-    return NextResponse.json(
-      { error: sendErr.message ?? "Email send failed" },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: sendErr.message ?? "Email send failed" }, { status: 502 });
   }
 
   return NextResponse.json(
@@ -154,8 +207,9 @@ export async function POST(req: Request) {
       messageId: sendData?.id ?? null,
       email,
       fileName,
-      sizeBytes: json.length,
-      counts,
+      sizeBytes: zipBuffer.length,
+      attached: !tooBig,
+      signedUrl,
     },
     { status: 200 },
   );

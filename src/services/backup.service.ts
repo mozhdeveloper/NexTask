@@ -22,12 +22,14 @@ export const backupService = {
     const me = useAuthStore.getState().user;
     if (!me || me.role !== "admin") throw new Error("Forbidden");
 
-    // local progress animation that mirrors the previous UX
+    // Indeterminate progress — real ZIP build can take 10-30s depending on
+    // attachment count. We ease toward 90% then jump to 100 when the server
+    // returns. No artificial sleep.
     let progress = 0;
     const interval = setInterval(() => {
-      progress = Math.min(95, progress + 5);
+      progress = Math.min(90, progress + 3);
       onProgress?.(progress);
-    }, 120);
+    }, 400);
 
     try {
       const res = await fetch("/api/backups/run", { method: "POST" });
@@ -98,7 +100,17 @@ export const backupService = {
       email: string;
       fileName: string;
       sizeBytes: number;
-      counts: Record<string, number>;
+      attached: boolean;
+      signedUrl: string | null;
     };
+  },
+
+  async download(backupId: string) {
+    const me = useAuthStore.getState().user;
+    if (!me || me.role !== "admin") throw new Error("Forbidden");
+    const res = await fetch(`/api/backups/download?id=${encodeURIComponent(backupId)}`);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body?.error ?? "Download failed");
+    return body as { url: string; fileName: string };
   },
 };
