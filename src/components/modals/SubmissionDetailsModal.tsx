@@ -22,7 +22,7 @@ import { logService } from "@/services/log.service";
 import { toast } from "sonner";
 
 const OVERRIDE_STATUSES: SubmissionStatus[] = [
-  "submitted", "late", "pending", "missing",
+  "submitted", "revised", "pending", "missing",
   "revision_requested", "revision_approved", "revision_rejected", "excused",
 ];
 

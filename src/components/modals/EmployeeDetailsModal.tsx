@@ -50,7 +50,7 @@ export function EmployeeDetailsModal({
     return mine.filter((s) => new Date(s.date) >= cutoff);
   }, [mine]);
   const submittedLast30 = last30.filter((s) => s.status !== "missing" && s.status !== "pending").length;
-  const lateLast30 = last30.filter((s) => s.status === "late").length;
+  const revisedLast30 = last30.filter((s) => s.status === "revised").length;
   const compliancePct = last30.length ? Math.round((submittedLast30 / last30.length) * 100) : 0;
   const recent = mine.slice(0, 6);
 
@@ -130,8 +130,8 @@ export function EmployeeDetailsModal({
                 <div className="text-ink-muted">Submitted (30d)</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-amber-600">{lateLast30}</div>
-                <div className="text-ink-muted">Late (30d)</div>
+                <div className="text-lg font-semibold text-sky-600">{revisedLast30}</div>
+                <div className="text-ink-muted">Revised (30d)</div>
               </div>
             </div>
           </div>

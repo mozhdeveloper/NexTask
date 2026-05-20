@@ -199,7 +199,7 @@ for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
     let status: Submission["status"] = "submitted";
     if (dayOffset === 0 && r < 3) status = "pending";
     else if (dayOffset === 0 && r === 3) status = "missing";
-    else if (r === 4) status = "late";
+    else if (r === 4) status = "revised";
     else if (r === 5) status = "revision_requested";
     else if (r === 6) status = "revision_approved";
 
@@ -226,7 +226,7 @@ for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
     }
 
     const submittedDate = new Date(daysAgo(dayOffset));
-    submittedDate.setHours(status === "late" ? 19 : 9 + (i % 8), 30 + i, 0, 0);
+    submittedDate.setHours(9 + (i % 8), 30 + i, 0, 0);
     const submittedAt = submittedDate.toISOString();
     const summary = sampleSummaries[(dayOffset + i) % sampleSummaries.length];
     const tasks = sampleTasks[(dayOffset + i) % sampleTasks.length];
@@ -249,11 +249,11 @@ for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
         },
       ],
       status,
-      locked: status === "submitted" || status === "revision_approved",
+      locked: status === "submitted" || status === "revised" || status === "revision_approved",
       submittedAt,
       lockedAt: submittedAt,
       uploadedIp: pseudoIp(u.id + date),
-      versionNumber: status === "revision_approved" ? 2 : 1,
+      versionNumber: status === "revision_approved" || status === "revised" ? 2 : 1,
       parentSubmissionId: null,
       filePath: buildSubmissionPath({
         username: u.name.split(" ")[0].toLowerCase(),
@@ -266,7 +266,7 @@ for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
 }
 
 export const seedRevisions: RevisionRequest[] = seedSubmissions
-  .filter((s) => s.status === "revision_requested" || s.status === "revision_approved")
+  .filter((s) => s.status === "revision_requested" || s.status === "revision_approved" || s.status === "revised")
   .slice(0, 8)
   .map((s, i) => ({
     id: `rev_${s.id}`,
@@ -276,11 +276,11 @@ export const seedRevisions: RevisionRequest[] = seedSubmissions
       i % 2 === 0
         ? "Uploaded the wrong version of the file, please allow re-upload."
         : "Need to update the work summary with the latest figures.",
-    status: s.status === "revision_approved" ? "approved" : "pending",
-    adminId: s.status === "revision_approved" ? "u_admin" : undefined,
-    adminNote: s.status === "revision_approved" ? "Approved — re-upload allowed." : undefined,
+    status: s.status === "revision_approved" || s.status === "revised" ? "approved" : "pending",
+    adminId: s.status === "revision_approved" || s.status === "revised" ? "u_admin" : undefined,
+    adminNote: s.status === "revision_approved" || s.status === "revised" ? "Approved — re-upload allowed." : undefined,
     createdAt: s.submittedAt ?? iso(NOW),
-    decidedAt: s.status === "revision_approved" ? iso(NOW) : undefined,
+    decidedAt: s.status === "revision_approved" || s.status === "revised" ? iso(NOW) : undefined,
   }));
 
 export const seedActivityLogs: ActivityLog[] = [];

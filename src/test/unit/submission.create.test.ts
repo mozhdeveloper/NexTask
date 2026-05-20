@@ -6,7 +6,7 @@
 //   • File-type validation  (pdf, png, jpg, jpeg, docx, xlsx, csv — and rejected types)
 //   • File-size validation  (per-type maxFileSizeMB, boundary values)
 //   • Happy paths           (each allowed type, zero files, mixed types)
-//   • Status assignment     (submitted vs late via deadline or work-end)
+//   • Status assignment     (submitted vs revised via revision flow)
 //   • Versioning            (new vs re-submit: version bump, parentId, cache replace)
 //   • Cache behaviour       (prepend, deduplicate)
 //   • Storage/DB errors     (graceful storage failure, hard DB failure)
@@ -94,6 +94,8 @@ const storeMock = {
   setSubmissions: vi.fn((s) => { submissions = s; }),
   notifications: [],
   setNotifications: vi.fn(),
+  revisions: [] as { id: string; submissionId: string; status: string; resubmittedAt?: string }[],
+  setRevisions: vi.fn(),
 };
 
 vi.mock("@/store/dataStore", () => ({
@@ -493,17 +495,16 @@ describe("submissionService.create — status assignment", () => {
     expect(sub.status).toBe("submitted");
   });
 
-  it("should assign 'late' when past the submission type's deadline time", async () => {
+  it("should assign 'submitted' when past the submission type's deadline time (no late concept)", async () => {
     state.pastDeadline = true;
     const sub = await submissionService.create(baseInput({ date: TODAY }));
-    expect(sub.status).toBe("late");
+    expect(sub.status).toBe("submitted");
   });
 
-  it("should assign 'late' when past work-end hours on today's date", async () => {
+  it("should assign 'submitted' when past work-end hours on today's date (no late concept)", async () => {
     state.pastWorkEnd = true;
-    // date is TODAY (same as todayISO mock) → isToday = true → pastWorkHours = true
     const sub = await submissionService.create(baseInput({ date: TODAY }));
-    expect(sub.status).toBe("late");
+    expect(sub.status).toBe("submitted");
   });
 
   it("should assign 'submitted' when past work-end but date is NOT today (historical submission)", async () => {
@@ -513,11 +514,11 @@ describe("submissionService.create — status assignment", () => {
     expect(sub.status).toBe("submitted");
   });
 
-  it("should assign 'late' when BOTH deadline AND work-end are past", async () => {
+  it("should assign 'submitted' when BOTH deadline AND work-end are past (no late concept)", async () => {
     state.pastDeadline = true;
     state.pastWorkEnd  = true;
     const sub = await submissionService.create(baseInput({ date: TODAY }));
-    expect(sub.status).toBe("late");
+    expect(sub.status).toBe("submitted");
   });
 });
 
@@ -570,6 +571,18 @@ describe("submissionService.create — re-submission and versioning", () => {
     const matches = updated.filter((s) => s.id === "sub_stable_id");
     expect(matches).toHaveLength(1);
     expect(updated).toHaveLength(1);
+  });
+
+  it("should assign 'revised' when re-uploading after an approved revision", async () => {
+    submissions = [priorSub({ status: "revision_approved", locked: false, submittedAt: "2026-05-19T09:00:00.000Z" })];
+    const sub = await submissionService.create(baseInput());
+    expect(sub.status).toBe("revised");
+  });
+
+  it("should assign 'submitted' when re-uploading over a non-revision-approved submission", async () => {
+    submissions = [priorSub({ status: "submitted", locked: false, submittedAt: "2026-05-19T09:00:00.000Z" })];
+    const sub = await submissionService.create(baseInput());
+    expect(sub.status).toBe("submitted");
   });
 
   it("should NOT re-submit when the existing submission is locked — throws", async () => {

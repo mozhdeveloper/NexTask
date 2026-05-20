@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 
-const STATUSES: SubmissionStatus[] = ["submitted", "late", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
+const STATUSES: SubmissionStatus[] = ["submitted", "revised", "missing", "pending", "revision_requested", "revision_approved", "revision_rejected"];
 const PAGE_SIZE = 20;
 
 export default function AdminSubmissionsPage() {
@@ -251,7 +251,7 @@ export default function AdminSubmissionsPage() {
           workSettingsService.addHoliday(holidayDate, "Holiday");
           const affected = submissions.filter(
             (s) => s.date === holidayDate &&
-              (s.status === "missing" || s.status === "late" || s.status === "pending"),
+              (s.status === "missing" || s.status === "pending"),
           );
           if (affected.length > 0) {
             toast(`${holidayDate} marked as holiday. ${affected.length} submission${affected.length > 1 ? "s" : ""} need attention.`, {

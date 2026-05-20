@@ -28,7 +28,7 @@ type ReportMeta = {
 
 const REPORTS: ReportMeta[] = [
   { type: "daily", title: "Daily Submissions", description: "Submissions with status, author, and timestamp.", icon: CalendarDays, tint: "bg-chip-teal text-teal-700" },
-  { type: "late", title: "Late Submissions", description: "Submissions that came in after the deadline.", icon: Clock, tint: "bg-chip-amber text-amber-700" },
+  { type: "revised", title: "Revised Submissions", description: "Submissions re-uploaded after a revision request.", icon: Clock, tint: "bg-chip-amber text-amber-700" },
   { type: "missing", title: "Missing Submissions", description: "Employees who haven't submitted on working days.", icon: AlertTriangle, tint: "bg-chip-rose text-rose-700" },
   { type: "employee_compliance", title: "Employee Compliance", description: "Per-employee submission rate.", icon: UserCheck, tint: "bg-chip-violet text-violet-700" },
   { type: "department_compliance", title: "Department Compliance", description: "Roll-up by department.", icon: Building2, tint: "bg-chip-indigo text-indigo-700" },

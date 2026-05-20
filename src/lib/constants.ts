@@ -8,7 +8,7 @@ export type Role = (typeof ROLES)[number];
 export const STATUSES = [
   "pending",
   "submitted",
-  "late",
+  "revised",
   "missing",
   "revision_requested",
   "revision_approved",

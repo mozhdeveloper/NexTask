@@ -77,7 +77,7 @@ describeIntegration("Schema — table existence and seed counts", () => {
 // ─── 2. ENUM CORRECTNESS ──────────────────────────────────────────────────────
 describeIntegration("Schema — submission status enum values", () => {
   const validStatuses = new Set([
-    "pending", "submitted", "late", "missing",
+    "pending", "submitted", "revised", "missing",
     "revision_requested", "revision_approved", "revision_rejected", "locked",
   ]);
 

@@ -11,7 +11,7 @@ import { workSettingsService } from "./workSettings.service";
 
 export type ReportType =
   | "daily"
-  | "late"
+  | "revised"
   | "missing"
   | "employee_compliance"
   | "department_compliance"
@@ -117,9 +117,9 @@ function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unk
           };
         });
 
-    case "late":
+    case "revised":
       return submissions
-        .filter((s) => s.status === "late" && inRange(s.date, start, end))
+        .filter((s) => s.status === "revised" && inRange(s.date, start, end))
         .sort((a, b) => b.date.localeCompare(a.date))
         .map((s) => {
           const u = userById(s.userId);
@@ -235,7 +235,7 @@ function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unk
 
 const REPORT_LABELS: Record<ReportType, string> = {
   daily: "Daily Submission Report",
-  late: "Late Submission Report",
+  revised: "Revised Submission Report",
   missing: "Missing Submission Report",
   employee_compliance: "Employee Compliance Report",
   department_compliance: "Department Compliance Report",

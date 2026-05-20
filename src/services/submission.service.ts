@@ -4,7 +4,7 @@
 import { useDataStore } from "@/store/dataStore";
 import { useAuthStore } from "@/store/authStore";
 import type { Attachment, Submission } from "@/types";
-import { nowISO, todayISO, isPastDeadline } from "@/lib/dates";
+import { nowISO, todayISO } from "@/lib/dates";
 import { buildSubmissionPath, hashStub, pseudoIp, uid } from "@/lib/helpers";
 import { logService } from "./log.service";
 import { notificationService } from "./notification.service";
@@ -116,11 +116,10 @@ export const submissionService = {
     const attachments = uploads.map((u) => u.attachment);
     const submittedAt = nowISO();
     const username = me.name.split(" ")[0].toLowerCase();
-    const pastDeadline = isPastDeadline(type.deadlineTime, new Date(input.date));
-    const isToday = input.date === todayISO();
-    // Past the workspace working-hours window for today → escalate to "late".
-    const pastWorkHours = isToday && workSettingsService.isPastWorkEnd();
-    const status: Submission["status"] = pastDeadline || pastWorkHours ? "late" : "submitted";
+    const isRevisionReupload = existing?.status === "revision_approved";
+    // Re-uploads after an approved revision are marked "revised" (locked, awaiting admin review).
+    // All other submissions are simply "submitted" regardless of timing — no "late" concept.
+    const status: Submission["status"] = isRevisionReupload ? "revised" : "submitted";
 
     const sub: Submission = {
       id: existing?.id ?? uid("sub"),
@@ -246,8 +245,7 @@ export const submissionService = {
       }
     }
 
-    // Notify admins and managers; use "warning" for late submissions.
-    const isLate = status === "late";
+    // Notify admins and managers.
     // True only when there was a previously *submitted* entry — not just a
     // started-but-not-yet-submitted startDay() record (versionNumber = 1 but submittedAt = null).
     const isRevision = !!existing?.submittedAt;
@@ -257,15 +255,9 @@ export const submissionService = {
         const link = recipient.role === "admin" ? "/admin/submissions" : "/manager/submissions";
         notificationService.push({
           userId: recipient.id,
-          type: isLate ? "warning" : "info",
-          title: isLate
-            ? "Late submission received"
-            : isRevision
-            ? "Revised submission received"
-            : "New submission received",
-          body: isLate
-            ? `${me.name} submitted "${type.name}" for ${input.date} past the deadline.`
-            : isRevision
+          type: "info",
+          title: isRevision ? "Revised submission received" : "New submission received",
+          body: isRevision
             ? `${me.name} re-uploaded a revised submission for "${type.name}" on ${input.date}.`
             : `${me.name} submitted "${type.name}" for ${input.date}.`,
           link,
@@ -512,7 +504,7 @@ export const submissionService = {
     if (prev && prev.status !== status && prev.userId !== me.id) {
       const statusLabels: Record<string, string> = {
         submitted: "marked as submitted",
-        late: "marked as late",
+        revised: "marked as revised",
         missing: "marked as missing",
         excused: "excused (no submission required)",
         revision_requested: "sent back for revision",
@@ -523,9 +515,9 @@ export const submissionService = {
       };
       const action = statusLabels[status] ?? `updated to ${status}`;
       const tone: "success" | "warning" | "danger" | "info" =
-        status === "submitted" || status === "revision_approved" || status === "excused"
+        status === "submitted" || status === "revised" || status === "revision_approved" || status === "excused"
           ? "success"
-          : status === "revision_requested" || status === "late"
+          : status === "revision_requested"
             ? "warning"
             : status === "missing" || status === "revision_rejected"
               ? "danger"
@@ -539,10 +531,9 @@ export const submissionService = {
         link: "/my-submissions",
       });
 
-      // Fan-out to admins + managers for late / missing escalations.
-      if (status === "late" || status === "missing") {
+      // Fan-out to admins + managers for missing escalations.
+      if (status === "missing") {
         const { users } = useDataStore.getState();
-        const label = status === "late" ? "Late submission" : "Missing submission";
         const submissionOwner = users.find((u) => u.id === prev.userId);
         const ownerName = submissionOwner?.name ?? "An employee";
         users
@@ -551,9 +542,9 @@ export const submissionService = {
             const link = recipient.role === "admin" ? "/admin/submissions" : "/manager/submissions";
             notificationService.push({
               userId: recipient.id,
-              type: status === "late" ? "warning" : "danger",
-              title: `${label} flagged`,
-              body: `${ownerName}'s submission for ${prev.date} was marked ${status} by ${me.name}.`,
+              type: "danger",
+              title: "Missing submission flagged",
+              body: `${ownerName}'s submission for ${prev.date} was marked missing by ${me.name}.`,
               link,
             });
           });
@@ -571,7 +562,7 @@ export const submissionService = {
     startOfWeek.setHours(0, 0, 0, 0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const isOk = (s: Submission) =>
-      s.status === "submitted" || s.status === "revision_approved" || s.status === "late";
+      s.status === "submitted" || s.status === "revised" || s.status === "revision_approved";
     const weekSubs = subs.filter((s) => new Date(s.date) >= startOfWeek && new Date(s.date) <= now);
     const monthSubs = subs.filter(
       (s) => new Date(s.date) >= startOfMonth && new Date(s.date) <= now

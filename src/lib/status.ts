@@ -6,7 +6,7 @@ export const STATUS_META: Record<
 > = {
   pending: { label: "Pending", bg: "bg-warning-soft", fg: "text-amber-700", dot: "bg-amber-500" },
   submitted: { label: "Submitted", bg: "bg-success-soft", fg: "text-emerald-700", dot: "bg-emerald-500" },
-  late: { label: "Late", bg: "bg-chip-peach", fg: "text-orange-700", dot: "bg-orange-500" },
+  revised: { label: "Revised", bg: "bg-sky-50", fg: "text-sky-700", dot: "bg-sky-500" },
   missing: { label: "Missing", bg: "bg-danger-soft", fg: "text-red-700", dot: "bg-red-500" },
   revision_requested: { label: "Revision Requested", bg: "bg-chip-violet", fg: "text-violet-700", dot: "bg-violet-500" },
   revision_approved: { label: "Revision Approved", bg: "bg-chip-mint", fg: "text-emerald-700", dot: "bg-emerald-500" },

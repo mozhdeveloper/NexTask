@@ -7,6 +7,7 @@ import {
   Clock,
   Download,
   PlusCircle,
+  RefreshCw,
   Send,
   Users,
   ClipboardList,
@@ -59,9 +60,9 @@ export default function AdminDashboard() {
   // Compliance counts include virtual "missing" rows; scoped to dept when manager.
   const counts = complianceService.dayCounts(today, scopeDeptId);
   const submittedToday = counts.submitted;
+  const revisedToday = counts.revised;
   const pendingToday = counts.pending;
   const missingToday = counts.missing;
-  const lateToday = counts.late;
   const revisions = useDataStore((s) => s.revisions);
   const pendingRevisions = revisions.filter(
     (r) => r.status === "pending" && (!scopeDeptId || employeeIds.has(r.userId)),
@@ -98,8 +99,8 @@ export default function AdminDashboard() {
 
   const donutData = [
     { name: "Submitted", value: submittedToday, color: "#66B2B2" },
+    { name: "Revised", value: revisedToday, color: "#0EA5E9" },
     { name: "Pending", value: pendingToday, color: "#F59E0B" },
-    { name: "Late", value: lateToday, color: "#F97316" },
     { name: "Missing", value: missingToday, color: "#EF4444" },
   ];
   const totalExpected = counts.expected || employees.length;
@@ -120,7 +121,7 @@ export default function AdminDashboard() {
 
   const overdueCells = complianceService
     .dayOverview(today, scopeDeptId)
-    .filter((c) => c.effectiveStatus === "late" || c.effectiveStatus === "missing")
+    .filter((c) => c.effectiveStatus === "missing")
     .slice(0, 5);
 
   const sendReminders = () => {
@@ -159,7 +160,7 @@ export default function AdminDashboard() {
         <StatCard icon={Users} label="Total Employees" value={employees.length} sublabel="active" tint="indigo" />
         <StatCard icon={ClipboardList} label="Submitted Today" value={submittedToday} sublabel={`of ${totalExpected}`} tint="teal" />
         <StatCard icon={Clock} label="Pending" value={pendingToday} sublabel="on-track" tint="amber" />
-        <StatCard icon={AlertTriangle} label="Late" value={lateToday} sublabel="past deadline" tint="rose" />
+        <StatCard icon={RefreshCw} label="Revised" value={revisedToday} sublabel="awaiting review" tint="indigo" />
         <StatCard icon={AlertTriangle} label="Missing" value={missingToday} sublabel="no submission" tint="rose" />
         <StatCard icon={Bell} label="Revision Requests" value={pendingRevisions} sublabel="pending" tint="amber" />
       </div>

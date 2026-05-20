@@ -29,7 +29,7 @@ export default function ProfilePage() {
   const monthRate = stats && stats.month.expected > 0
     ? Math.round((stats.month.submitted / stats.month.expected) * 100)
     : null;
-  const lateCount = mine.filter((s) => s.status === "late").length;
+  const revisedCount = mine.filter((s) => s.status === "revised").length;
 
   return (
     <div className="space-y-6">
@@ -89,9 +89,9 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Late Submissions</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Revised Submissions</CardTitle></CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{lateCount}</div>
+            <div className="text-3xl font-bold">{revisedCount}</div>
             <div className="text-sm text-ink-muted">all time</div>
           </CardContent>
         </Card>

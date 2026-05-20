@@ -31,7 +31,7 @@ import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 
 const SUBMITTED_STATUSES = new Set<SubmissionStatus>([
-  "submitted", "late", "locked",
+  "submitted", "revised", "locked",
   "revision_requested", "revision_approved", "revision_rejected",
 ]);
 
@@ -49,7 +49,7 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const STATUS_DOT: Record<SubmissionStatus, string> = {
   pending: "bg-amber-400",
   submitted: "bg-emerald-500",
-  late: "bg-orange-500",
+  revised: "bg-sky-500",
   missing: "bg-rose-500",
   revision_requested: "bg-violet-500",
   revision_approved: "bg-emerald-400",
@@ -61,7 +61,7 @@ const STATUS_DOT: Record<SubmissionStatus, string> = {
 const STATUS_CHIP: Record<SubmissionStatus, string> = {
   pending: "bg-amber-50 text-amber-700 border-amber-200",
   submitted: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  late: "bg-orange-50 text-orange-700 border-orange-200",
+  revised: "bg-sky-50 text-sky-700 border-sky-200",
   missing: "bg-rose-50 text-rose-700 border-rose-200",
   revision_requested: "bg-violet-50 text-violet-700 border-violet-200",
   revision_approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -71,11 +71,11 @@ const STATUS_CHIP: Record<SubmissionStatus, string> = {
 };
 
 const LEGEND: SubmissionStatus[] = [
-  "submitted", "pending", "late", "missing", "revision_requested",
+  "submitted", "pending", "revised", "missing", "revision_requested",
 ];
 
 const FILTER_STATUSES: SubmissionStatus[] = [
-  "submitted", "pending", "late", "missing",
+  "submitted", "pending", "revised", "missing",
   "revision_requested", "revision_approved", "revision_rejected",
   "excused", "locked",
 ];

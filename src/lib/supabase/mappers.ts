@@ -86,7 +86,7 @@ export const mapSubmission = (
   workSummary: r.work_summary,
   tasksDetails: r.tasks_details,
   attachments: attachments.map(mapAttachment),
-  status: r.status,
+  status: r.status as Submission["status"],
   locked: r.locked,
   submittedAt: r.submitted_at,
   lockedAt: r.locked_at,

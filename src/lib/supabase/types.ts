@@ -6,7 +6,8 @@ export type DbUserRole = "admin" | "manager" | "employee";
 export type DbSubmissionStatus =
   | "pending"
   | "submitted"
-  | "late"
+  | "late"       // legacy — no longer assigned, kept for DB compatibility
+  | "revised"
   | "missing"
   | "revision_requested"
   | "revision_approved"

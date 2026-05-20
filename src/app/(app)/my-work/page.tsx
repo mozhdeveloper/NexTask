@@ -135,8 +135,8 @@ export default function MyWorkPage() {
         return { label: "Awaiting review", color: "bg-amber-50 border-amber-200 text-amber-700", dot: "bg-amber-500" };
       if (s === "revision_approved" || s === "submitted")
         return { label: "Approved", color: "bg-emerald-50 border-emerald-200 text-emerald-700", dot: "bg-emerald-500" };
-      if (s === "late")
-        return { label: "Late submission", color: "bg-orange-50 border-orange-200 text-orange-700", dot: "bg-orange-500" };
+      if (s === "revised")
+        return { label: "Revised — awaiting review", color: "bg-sky-50 border-sky-200 text-sky-700", dot: "bg-sky-500" };
       if (s === "revision_rejected")
         return { label: "Revision rejected", color: "bg-rose-50 border-rose-200 text-rose-700", dot: "bg-rose-500" };
       return { label: "Submitted", color: "bg-emerald-50 border-emerald-200 text-emerald-700", dot: "bg-emerald-500" };

@@ -64,9 +64,9 @@ export function dayOverview(date: string, deptId?: string | null): DayCell[] {
 export function dayCounts(date: string, deptId?: string | null) {
   const cells = dayOverview(date, deptId);
   let submitted = 0;
+  let revised = 0;
   let pending = 0;
   let missing = 0;
-  let late = 0;
   let expected = 0;
   for (const c of cells) {
     if (c.effectiveStatus === null) continue;
@@ -77,19 +77,19 @@ export function dayCounts(date: string, deptId?: string | null) {
       case "excused":
         submitted++;
         break;
+      case "revised":
+        revised++;
+        break;
       case "pending":
         pending++;
         break;
       case "missing":
         missing++;
         break;
-      case "late":
-        late++;
-        break;
       // revision_requested / revision_rejected / locked: do not affect headline counts
     }
   }
-  return { submitted, pending, missing, late, expected };
+  return { submitted, revised, pending, missing, expected };
 }
 
 /**

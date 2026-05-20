@@ -29,12 +29,12 @@ import type { SubmissionStatus } from "@/lib/constants";
 
 // --- constants -------------------------------------------------------------
 const SUBMITTED_STATUSES = new Set<SubmissionStatus>([
-  "submitted", "late", "locked",
+  "submitted", "revised", "locked",
   "revision_requested", "revision_approved", "revision_rejected",
 ]);
 
 const ALL_STATUSES: SubmissionStatus[] = [
-  "submitted", "late", "pending", "missing",
+  "submitted", "revised", "pending", "missing",
   "revision_requested", "revision_approved", "revision_rejected", "excused",
 ];
 
@@ -42,7 +42,7 @@ const ALL_STATUSES: SubmissionStatus[] = [
 const STATUS_FILTER_OPTIONS: Array<{ value: SubmissionStatus | "all" | "missing"; label: string }> = [
   { value: "all",                label: "All statuses" },
   { value: "submitted",          label: "Submitted" },
-  { value: "late",               label: "Late" },
+  { value: "revised",            label: "Revised" },
   { value: "pending",            label: "Pending" },
   { value: "missing",            label: "No submission" },
   { value: "revision_requested", label: "Revision Requested" },

@@ -83,7 +83,7 @@ export default function MySubmissionsPage() {
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="late">Late</SelectItem>
+                <SelectItem value="revised">Revised</SelectItem>
                 <SelectItem value="missing">Missing</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="revision_requested">Revision requested</SelectItem>

@@ -168,7 +168,7 @@ describe("submissionService.markStatus", () => {
     const s2 = createSubmission({ id: "sub_2", status: "submitted" });
     submissions = [s1, s2];
 
-    await submissionService.markStatus("sub_1", "late");
+    await submissionService.markStatus("sub_1", "missing");
 
     const updated = storeMock.setSubmissions.mock.calls[0][0];
     expect(updated.find((x: { id: string }) => x.id === "sub_2").status).toBe("submitted");
