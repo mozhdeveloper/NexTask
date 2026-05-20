@@ -1,13 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-import { Database, Play, Download, Clock, Mail, Lock,
+  Database, Play, Download, Clock, Mail, Lock,
   CheckCircle2, AlertCircle, BellRing, CalendarClock, Shield,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
-import { Label } from "@/components/ui/input";
 import { workSettingsService } from "@/services/workSettings.service";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,10 +18,11 @@ import { RunBackupModal } from "@/components/modals/RunBackupModal";
 import { SendBackupEmailModal } from "@/components/modals/SendBackupEmailModal";
 import { useRequireRole } from "@/hooks/useAuth";
 import { StatCard } from "@/components/cards/StatCard";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { backupService } from "@/services/backup.service";
-import { Input } from "@/components/ui/input";
+
+const LOCKED_BACKUP_RECIPIENT = "premium.global.official@gmail.com";
+const LOCKED_BACKUP_TIME = "22:00"; // matches Vercel cron — not user-configurable
 
 function fmt12(time: string): string {
   const [h, m] = time.split(":").map(Number);
