@@ -224,6 +224,7 @@ export default function EmployeesPage() {
           <div className="-mx-5 mt-4 border-t border-surface-border" />
 
           {/* Content */}
+          <div className="mt-4">
           {pageRows.length === 0 ? (
             <EmptyState
               icon={Users}
@@ -373,6 +374,7 @@ export default function EmployeesPage() {
               </TBody>
             </Table>
           )}
+          </div>
 
           {rows.length > PAGE_SIZE && (
             <div className="mt-4">
