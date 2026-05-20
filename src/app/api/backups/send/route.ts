@@ -21,8 +21,16 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20 MB
-const isEmail = (v: unknown): v is string =>
-  typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+// Manual "Email backup" deliveries are permanently locked to this address.
+// This matches the Resend account owner (the only recipient Resend will accept
+// while the custom sending domain is unverified) and gives admins a single,
+// auditable destination for ad-hoc backup emails.
+export const MANUAL_BACKUP_RECIPIENT = "premium.global.official@gmail.com";
+
+// Resend always allows this FROM without a verified domain. Using it for
+// manual sends guarantees deliverability regardless of RESEND_FROM env state.
+const MANUAL_BACKUP_FROM = "NexTask Backups <onboarding@resend.dev>";
 
 export async function POST(req: Request) {
   const sb = createSupabaseServerClient();
@@ -45,14 +53,18 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const email = isEmail(body.email) ? body.email : null;
-  if (!email) {
-    return NextResponse.json({ error: "Valid email required" }, { status: 400 });
-  }
+  // Manual backup sends are permanently locked to MANUAL_BACKUP_RECIPIENT.
+  // We ignore any client-supplied email to avoid Resend rejecting the send
+  // (the sending domain is currently unverified, so Resend only accepts the
+  // account-owner address). We still accept the field for API back-compat.
+  void body.email;
+  const email = MANUAL_BACKUP_RECIPIENT;
   const backupId = typeof body.backupId === "string" ? body.backupId : null;
 
   const apiKey = process.env.RESEND_API_KEY;
-  const fromAddr = process.env.RESEND_FROM ?? "NexTask <onboarding@resend.dev>";
+  // Use onboarding@resend.dev for manual sends — always allowed by Resend even
+  // without a verified domain, so deliverability does not depend on env config.
+  const fromAddr = MANUAL_BACKUP_FROM;
   if (!apiKey) {
     return NextResponse.json(
       { error: "RESEND_API_KEY not configured on the server" },

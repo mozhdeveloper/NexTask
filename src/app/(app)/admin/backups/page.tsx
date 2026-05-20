@@ -93,6 +93,7 @@ export default function BackupsPage() {
             </div>
             <Button
               variant="ghost"
+              title="Sends to premium.global.official@gmail.com (locked)"
               onClick={() => { setSendTarget({ id: last?.id, fileName: last?.fileName }); setSendOpen(true); }}
             >
               <Mail className="h-4 w-4" /> Email backup
@@ -183,7 +184,14 @@ export default function BackupsPage() {
                 onChange={(e) => { setAbEmail(e.target.value); setDirty(true); }}
               />
               <p className="text-[11px] text-ink-soft">
-                Used for auto backup notifications and the &ldquo;Email backup&rdquo; button above.
+                Used for auto backup notifications only.
+              </p>
+              <p className="flex items-start gap-1.5 text-[11px] text-ink-muted">
+                <Mail className="mt-[2px] h-3 w-3 flex-shrink-0" />
+                <span>
+                  Manual <em>Email backup</em> sends are permanently locked to{" "}
+                  <span className="font-semibold text-ink">premium.global.official@gmail.com</span>.
+                </span>
               </p>
             </div>
           </div>
