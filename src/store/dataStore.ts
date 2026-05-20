@@ -102,23 +102,28 @@ export const useDataStore = create<DataState>()(
     }),
     {
       name: `${STORAGE_PREFIX}data`,
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
-      // Only persist lightweight settings — bulk data (submissions, logs, users etc.)
-      // is always fetched fresh from Supabase on boot, so storing it in localStorage
-      // wastes quota (5 MB limit) and causes stale-data flickering.
+      // Persist submissions + revisions so workflow state (approvals, status
+      // changes) survives page refreshes. Settings are also persisted.
+      // Heavy bulk data (logs, backups, users, projects) is intentionally
+      // excluded to stay well within the 5 MB localStorage limit.
       partialize: (state) => ({
+        submissions: state.submissions,
+        revisions: state.revisions,
         workSettings: state.workSettings,
         autoBackupSettings: state.autoBackupSettings,
         permissions: state.permissions,
       }),
       // Deep-merge so partial stored data never wipes required fields.
-      // e.g. an old stored { holidays: [] } won't erase workingDays from the default.
       merge: (persisted: unknown, current: DataState): DataState => {
         const p = (persisted ?? {}) as Partial<DataState>;
         const def = initial();
         return {
           ...current,
+          // Use persisted workflow data when available; fall back to seed.
+          submissions: p.submissions ?? current.submissions,
+          revisions: p.revisions ?? current.revisions,
           workSettings: { ...def.workSettings, ...(p.workSettings ?? {}) },
           autoBackupSettings: { ...def.autoBackupSettings, ...(p.autoBackupSettings ?? {}) },
           permissions: p.permissions ?? current.permissions,
