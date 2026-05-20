@@ -1,16 +1,13 @@
 ﻿"use client";
 import { useMemo, useState } from "react";
 import {
-  ChevronLeft, ChevronRight,
-  CalendarDays, LayoutGrid, List, FileText, Filter,
+  ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, List, FileText, Users,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "@/components/layouts/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// Select is still used for the user picker in PageHeader actions
 import {
   format,
   addMonths, subMonths,
@@ -30,15 +27,17 @@ import { workSettingsService } from "@/services/workSettings.service";
 import type { Submission } from "@/types";
 import type { SubmissionStatus } from "@/lib/constants";
 
-// Statuses that count as "submitted" for the day badge and modal header.
 const SUBMITTED_STATUSES = new Set<SubmissionStatus>([
   "submitted", "late", "locked",
   "revision_requested", "revision_approved", "revision_rejected",
 ]);
 
-// ─── constants ────────────────────────────────────────────────────────────────
 type CalView = "month" | "week" | "list";
-type ListGrouping = "day" | "week" | "month";
+type ListPeriod = "day" | "week" | "month";
+
+/** Sentinel value meaning "show all employees" in the user picker */
+const ALL_USERS = "__all__";
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const STATUS_DOT: Record<SubmissionStatus, string> = {
@@ -74,8 +73,6 @@ const FILTER_STATUSES: SubmissionStatus[] = [
   "revision_requested", "revision_approved", "revision_rejected",
   "excused", "locked",
 ];
-
-
 
 // ─── DayCell ─────────────────────────────────────────────────────────────────
 function DayCell({
@@ -197,6 +194,35 @@ function Legend() {
   );
 }
 
+// ─── SegmentedControl ─────────────────────────────────────────────────────────
+function SegmentedControl<T extends string>({
+  options, value, onChange, className,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center rounded-lg border border-surface-border bg-white p-0.5 gap-0.5", className)}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+            value === o.value
+              ? "bg-primary text-white shadow-sm"
+              : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
   const user = useAuth();
@@ -204,24 +230,27 @@ export default function CalendarPage() {
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
 
+  const canSelect = user?.role === "admin" || user?.role === "manager";
+
+  // Default admin/manager to "all employees" view; employees see only themselves.
+  const [viewUserId, setViewUserId] = useState<string>(canSelect ? ALL_USERS : (user?.id ?? ""));
   const [cursor, setCursor] = useState(new Date());
   const [picked, setPicked] = useState<Date | null>(new Date());
   const [modal, setModal] = useState<Submission | null>(null);
   const [dayModalDate, setDayModalDate] = useState<Date | null>(null);
   const [dayModalOpen, setDayModalOpen] = useState(false);
-  const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
-  const [listGrouping, setListGrouping] = useState<ListGrouping>("month");
+  const [listPeriod, setListPeriod] = useState<ListPeriod>("month");
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "all">("all");
 
-  // ── employee pool ─────────────────────────────────────────────────────────
-  // All active employees (no managers/admins) used for count badges.
+  const today = new Date();
+
+  // ── employee pools ────────────────────────────────────────────────────────
   const allActiveEmployees = useMemo(
     () => users.filter((u) => u.isActive && u.role === "employee"),
     [users]
   );
 
-  // Role-scoped employee list shown in the DayDetailModal.
   const scopedEmployees = useMemo(() => {
     if (user?.role === "manager") {
       return allActiveEmployees.filter((u) => u.departmentId === user.departmentId);
@@ -229,232 +258,235 @@ export default function CalendarPage() {
     return allActiveEmployees;
   }, [user?.role, user?.departmentId, allActiveEmployees]);
 
-  // Per-day submitted count — only SUBMITTED_STATUSES so it matches the modal header.
-  const dayCountMap = useMemo(() => {
-    const m = new Map<string, number>();
-    const employeeIds = new Set(allActiveEmployees.map((u) => u.id));
-    submissions
-      .filter((s) => employeeIds.has(s.userId) && SUBMITTED_STATUSES.has(s.status))
-      .forEach((s) => {
-        m.set(s.date, (m.get(s.date) ?? 0) + 1);
-      });
-    return m;
-  }, [submissions, allActiveEmployees]);
-
   const allEmployeeIds = useMemo(
     () => new Set(allActiveEmployees.map((u) => u.id)),
     [allActiveEmployees]
   );
 
-  const canSelect = user?.role === "admin" || user?.role === "manager";
-  const canOverride = user?.role === "admin" || user?.role === "manager";
-  // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
-  const pickedUserInScope = (() => {
-    if (!user || !viewUserId) return false;
-    const target = users.find((u) => u.id === viewUserId);
-    if (!target) return false;
-    if (user.role === "manager" && target.departmentId !== user.departmentId) return false;
-    return true;
-  })();
-  const effectiveId = canSelect && pickedUserInScope ? viewUserId! : (user?.id ?? "");
-  const effectiveUser = users.find((u) => u.id === effectiveId) ?? user;
+  // ── resolved identity ─────────────────────────────────────────────────────
+  const isAllMode = canSelect && viewUserId === ALL_USERS;
+  const effectiveId = isAllMode ? "" : viewUserId;
+  const effectiveUser = isAllMode ? null : (users.find((u) => u.id === effectiveId) ?? user);
   const isSelf = effectiveId === user?.id;
-  const today = new Date();
 
-  // ── day map (filter-aware) ────────────────────────────────────────────────
+  // Users shown in the picker (scoped by manager's dept)
+  const pickableUsers = useMemo(() => {
+    if (!canSelect) return [];
+    return users
+      .filter((u) => u.isActive)
+      .filter((u) => user?.role !== "manager" || u.departmentId === user.departmentId)
+      .filter((u) => u.id !== user?.id) // exclude self — "My calendar" is the self option
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, user, canSelect]);
+
+  // ── per-day submitted count (all employees) ───────────────────────────────
+  const dayCountMap = useMemo(() => {
+    const m = new Map<string, number>();
+    submissions
+      .filter((s) => allEmployeeIds.has(s.userId) && SUBMITTED_STATUSES.has(s.status))
+      .forEach((s) => m.set(s.date, (m.get(s.date) ?? 0) + 1));
+    return m;
+  }, [submissions, allEmployeeIds]);
+
+  // ── day map for month/week grid (individual mode only) ───────────────────
   const dayMap = useMemo(() => {
+    if (isAllMode) return new Map<string, Submission>();
     const m = new Map<string, Submission>();
     submissions
       .filter((s) => s.userId === effectiveId)
-      .filter((s) => statusFilter === "all" || s.status === statusFilter)
       .forEach((s) => m.set(s.date, s));
     return m;
-  }, [effectiveId, submissions, statusFilter]);
-
+  }, [isAllMode, effectiveId, submissions]);
 
   // ── navigation ────────────────────────────────────────────────────────────
-  const goBack = () => view === "week" ? setCursor(subWeeks(cursor, 1)) : setCursor(subMonths(cursor, 1));
-  const goFwd  = () => view === "week" ? setCursor(addWeeks(cursor, 1)) : setCursor(addMonths(cursor, 1));
-  const goToday = () => { setCursor(new Date()); setPicked(new Date()); };
+  const goBack   = () => view === "week" ? setCursor(subWeeks(cursor, 1))  : setCursor(subMonths(cursor, 1));
+  const goFwd    = () => view === "week" ? setCursor(addWeeks(cursor, 1))   : setCursor(addMonths(cursor, 1));
+  const goToday  = () => { setCursor(new Date()); setPicked(new Date()); };
 
   // ── derived day lists ─────────────────────────────────────────────────────
   const monthDays = useMemo(() => eachDayOfInterval({
     start: startOfWeek(startOfMonth(cursor)),
-    end: endOfWeek(endOfMonth(cursor)),
+    end:   endOfWeek(endOfMonth(cursor)),
   }), [cursor]);
 
   const weekDays = useMemo(() => eachDayOfInterval({
     start: startOfWeek(cursor),
-    end: endOfWeek(cursor),
+    end:   endOfWeek(cursor),
   }), [cursor]);
 
+  // ── list items (period + status + user filtered) ──────────────────────────
   const listItems = useMemo(() => {
-    const today = new Date();
+    const now = new Date();
     let intervalStart: Date;
     let intervalEnd: Date;
-    if (listGrouping === "day") {
-      intervalStart = new Date(today); intervalStart.setHours(0,0,0,0);
-      intervalEnd   = new Date(today); intervalEnd.setHours(23,59,59,999);
-    } else if (listGrouping === "week") {
-      intervalStart = startOfWeek(today);
-      intervalEnd   = endOfWeek(today);
+    if (listPeriod === "day") {
+      intervalStart = new Date(now); intervalStart.setHours(0, 0, 0, 0);
+      intervalEnd   = new Date(now); intervalEnd.setHours(23, 59, 59, 999);
+    } else if (listPeriod === "week") {
+      intervalStart = startOfWeek(now);
+      intervalEnd   = endOfWeek(now);
     } else {
-      intervalStart = startOfMonth(today);
-      intervalEnd   = endOfMonth(today);
+      intervalStart = startOfMonth(now);
+      intervalEnd   = endOfMonth(now);
     }
     return [...submissions]
-      .filter((s) => s.userId === effectiveId)
+      .filter((s) => isAllMode ? allEmployeeIds.has(s.userId) : s.userId === effectiveId)
       .filter((s) => statusFilter === "all" || s.status === statusFilter)
-      .filter((s) => {
-        const d = parseISO(s.date);
-        return isWithinInterval(d, { start: intervalStart, end: intervalEnd });
-      })
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [submissions, effectiveId, listGrouping, statusFilter]);
+      .filter((s) => isWithinInterval(parseISO(s.date), { start: intervalStart, end: intervalEnd }))
+      .sort((a, b) => b.date.localeCompare(a.date) || a.userId.localeCompare(b.userId));
+  }, [submissions, isAllMode, allEmployeeIds, effectiveId, listPeriod, statusFilter]);
 
-  if (!user || !effectiveUser) return null;
+  if (!user) return null;
 
   // ── period label ──────────────────────────────────────────────────────────
   const periodLabel = view === "week"
     ? `${format(startOfWeek(cursor), "MMM d")} – ${format(endOfWeek(cursor), "MMM d, yyyy")}`
     : format(cursor, "MMMM yyyy");
 
-  // ── cell handler ──────────────────────────────────────────────────────────
+  const listPeriodLabel = {
+    day:   `Today, ${format(today, "MMMM d, yyyy")}`,
+    week:  `${format(startOfWeek(today), "MMM d")} – ${format(endOfWeek(today), "MMM d")}`,
+    month: format(today, "MMMM yyyy"),
+  }[listPeriod];
+
+  // ── cell click handler ────────────────────────────────────────────────────
   const handleSelect = (d: Date) => {
     setPicked(d);
     if (view === "month") setCursor(d);
-    // Always open the day detail modal on click (all roles)
     setDayModalDate(d);
     setDayModalOpen(true);
   };
 
+  // ── list grouped by date ──────────────────────────────────────────────────
+  const listGroups = useMemo(() => {
+    const map = new Map<string, Submission[]>();
+    listItems.forEach((s) => {
+      const arr = map.get(s.date) ?? [];
+      arr.push(s);
+      map.set(s.date, arr);
+    });
+    return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
+  }, [listItems]);
+
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Calendar"
-        description={
-          isSelf
-            ? "Track your submission history by day, week, or month."
-            : `Viewing ${effectiveUser.name}'s calendar.`
-        }
-        actions={
-          canSelect && (
-            <Select
-              value={viewUserId ?? user.id}
-              onValueChange={(v) => setViewUserId(v === user.id ? null : v)}
-            >
-              <SelectTrigger className="w-full sm:w-56"><SelectValue /></SelectTrigger>
+    <div className="space-y-4">
+      {/* ── Page header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-ink sm:text-2xl">Calendar</h1>
+          <p className="mt-0.5 text-sm text-ink-muted">
+            {isAllMode
+              ? "Team submission overview."
+              : isSelf
+              ? "Track your submission history by day, week, or month."
+              : `Viewing ${effectiveUser?.name ?? ""}'s calendar.`}
+          </p>
+        </div>
+
+        {/* Controls: user picker + view switcher */}
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+          {/* User picker — admins & managers only */}
+          {canSelect && (
+            <Select value={viewUserId} onValueChange={setViewUserId}>
+              <SelectTrigger className="h-9 w-44 sm:w-52 text-sm">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
+                <SelectItem value={ALL_USERS}>
+                  <span className="flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-ink-muted" />
+                    All employees
+                  </span>
+                </SelectItem>
                 <SelectItem value={user.id}>My calendar</SelectItem>
-                {users
-                  .filter((u) => u.isActive && u.id !== user.id)
-                  // Managers may only browse calendars within their own department.
-                  .filter((u) => user.role !== "manager" || u.departmentId === user.departmentId)
-                  .map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                {pickableUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          )
-        }
-      />
+          )}
 
-      {/* ── Toolbar row 1: navigation + view switcher ──────────────────── */}
+          {/* View switcher */}
+          <div className="flex items-center rounded-lg border border-surface-border bg-white p-0.5 gap-0.5">
+            {([
+              { key: "month" as CalView, Icon: LayoutGrid,  label: "Month" },
+              { key: "week"  as CalView, Icon: CalendarDays, label: "Week"  },
+              { key: "list"  as CalView, Icon: List,          label: "List"  },
+            ]).map(({ key, Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
+                  view === key
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Toolbar: navigation / period / list controls ─────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        {/* Period navigation */}
         {view !== "list" ? (
+          /* Month / Week nav */
           <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" onClick={goBack} aria-label="Previous">
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={goBack} aria-label="Previous">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="px-1 text-center text-sm font-semibold text-ink">
+            <span className="min-w-[140px] px-1 text-center text-sm font-semibold text-ink">
               {periodLabel}
             </span>
-            <Button size="icon" variant="ghost" onClick={goFwd} aria-label="Next">
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={goFwd} aria-label="Next">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="outline" onClick={goToday} className="ml-1 hidden sm:inline-flex">
+            <Button size="sm" variant="outline" onClick={goToday} className="ml-1 h-8 text-xs">
               Today
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-semibold text-ink">
-              {listGrouping === "day" ? "Today" : listGrouping === "week" ? "This week" : "This month"}
-            </div>
-            <div className="ml-auto flex items-center rounded-lg border border-surface-border bg-white p-0.5 gap-0.5">
-              {(["day", "week", "month"] as ListGrouping[]).map((g) => (
-                <button key={g}
-                  onClick={() => setListGrouping(g)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors capitalize",
-                    listGrouping === g
-                      ? "bg-primary text-white shadow-sm"
-                      : "text-ink-muted hover:bg-surface-subtle hover:text-ink",
-                  )}>
-                  {g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}
-                </button>
-              ))}
-            </div>
+          /* List view: period selector + period label */
+          <div className="flex flex-wrap items-center gap-2">
+            <SegmentedControl<ListPeriod>
+              value={listPeriod}
+              onChange={setListPeriod}
+              options={[
+                { value: "day",   label: "Daily"   },
+                { value: "week",  label: "Weekly"  },
+                { value: "month", label: "Monthly" },
+              ]}
+            />
+            <span className="text-sm text-ink-muted">{listPeriodLabel}</span>
           </div>
         )}
 
-        {/* View switcher */}
-        <div className="flex items-center rounded-lg border border-surface-border bg-white p-1 gap-0.5">
-          {([
-            { key: "month", Icon: LayoutGrid,  label: "Month" },
-            { key: "week",  Icon: CalendarDays, label: "Week"  },
-            { key: "list",  Icon: List,          label: "List"  },
-          ] as const).map(({ key, Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setView(key)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                view === key
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-ink-muted hover:bg-surface-subtle hover:text-ink"
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-        </div>
+        {/* List view: status filter (right side) */}
+        {view === "list" && (
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as SubmissionStatus | "all")}>
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {FILTER_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  <span className="flex items-center gap-2">
+                    <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", STATUS_DOT[s])} />
+                    {STATUS_META[s].label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
-      {/* ── Status filter chips ───────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Filter className="h-3.5 w-3.5 flex-shrink-0 text-ink-muted" />
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            onClick={() => setStatusFilter("all")}
-            className={cn(
-              "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              statusFilter === "all"
-                ? "border-primary bg-primary text-white shadow-sm"
-                : "border-surface-border bg-white text-ink-muted hover:border-ink-soft hover:text-ink"
-            )}
-          >
-            All statuses
-          </button>
-          {FILTER_STATUSES.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                statusFilter === s
-                  ? cn(STATUS_CHIP[s], "shadow-sm")
-                  : "border-surface-border bg-white text-ink-muted hover:border-ink-soft hover:text-ink"
-              )}
-            >
-              <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s])} />
-              {STATUS_META[s].label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── MONTH VIEW ────────────────────────────────────────────────────── */}
+      {/* ── MONTH VIEW ───────────────────────────────────────────────────── */}
       {view === "month" && (
         <Card>
           <CardContent className="p-2 sm:p-4">
@@ -492,148 +524,198 @@ export default function CalendarPage() {
         </Card>
       )}
 
-      {/* ── WEEK VIEW ─────────────────────────────────────────────────────── */}
+      {/* ── WEEK VIEW ────────────────────────────────────────────────────── */}
       {view === "week" && (
         <Card>
           <CardContent className="p-2 sm:p-4">
             <div className="overflow-x-auto -mx-1 px-1">
-            <div className="grid min-w-[480px] grid-cols-7 gap-2">
-              {weekDays.map((d) => {
-                const iso = format(d, "yyyy-MM-dd");
-                const isT = isSameDay(d, today);
-                return (
-                  <div key={iso} className="flex flex-col gap-1">
-                    {/* Column header */}
-                    <div className="flex flex-col items-center pb-2">
-                      <span className={cn(
-                        "text-[10px] font-semibold uppercase tracking-wide",
-                        isT ? "text-primary" : "text-ink-muted"
-                      )}>
-                        {format(d, "EEE")}
-                      </span>
-                      <span className={cn(
-                        "mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold",
-                        isT ? "bg-primary text-white" : "text-ink"
-                      )}>
-                        {format(d, "d")}
-                      </span>
+              <div className="grid min-w-[480px] grid-cols-7 gap-2">
+                {weekDays.map((d) => {
+                  const iso = format(d, "yyyy-MM-dd");
+                  const isT = isSameDay(d, today);
+                  return (
+                    <div key={iso} className="flex flex-col gap-1">
+                      <div className="flex flex-col items-center pb-2">
+                        <span className={cn(
+                          "text-[10px] font-semibold uppercase tracking-wide",
+                          isT ? "text-primary" : "text-ink-muted"
+                        )}>
+                          {format(d, "EEE")}
+                        </span>
+                        <span className={cn(
+                          "mt-1 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold",
+                          isT ? "bg-primary text-white" : "text-ink"
+                        )}>
+                          {format(d, "d")}
+                        </span>
+                      </div>
+                      <DayCell
+                        d={d}
+                        sub={dayMap.get(iso)}
+                        inMonth
+                        isToday={false}
+                        isPicked={!!picked && isSameDay(d, picked)}
+                        compact={false}
+                        onSelect={handleSelect}
+                        submittedCount={dayCountMap.get(iso) ?? 0}
+                        totalCount={allActiveEmployees.length}
+                      />
                     </div>
-                    <DayCell
-                      d={d}
-                      sub={dayMap.get(iso)}
-                      inMonth
-                      isToday={false}
-                      isPicked={!!picked && isSameDay(d, picked)}
-                      compact={false}
-                      onSelect={handleSelect}
-                      submittedCount={dayCountMap.get(iso) ?? 0}
-                      totalCount={allActiveEmployees.length}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
             </div>
             <Legend />
           </CardContent>
         </Card>
       )}
 
-      {/* ── LIST VIEW ─────────────────────────────────────────────────────── */}
+      {/* ── LIST VIEW ────────────────────────────────────────────────────── */}
       {view === "list" && (
-        <Card>
-          {listItems.length === 0 ? (
+        <Card className="overflow-hidden">
+          {listGroups.length === 0 ? (
             <CardContent className="flex flex-col items-center py-16 text-center">
               <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-subtle">
                 <FileText className="h-6 w-6 text-ink-soft" />
               </div>
               <p className="font-semibold text-ink">No submissions found</p>
               <p className="mt-1 text-sm text-ink-muted">
-                {isSelf
+                {statusFilter !== "all"
+                  ? `No ${STATUS_META[statusFilter as SubmissionStatus]?.label ?? statusFilter} submissions in this period.`
+                  : isAllMode
+                  ? "No submissions have been recorded in this period."
+                  : isSelf
                   ? "Your submitted work will appear here once you start submitting."
-                  : `No submissions found for ${effectiveUser.name} in this period.`}
+                  : `No submissions found for ${effectiveUser?.name ?? "this employee"} in this period.`}
               </p>
             </CardContent>
           ) : (
-            (() => {
-              // Group items by date for daily/weekly; by week-of-month for monthly
-              const groups = new Map<string, Submission[]>();
-              listItems.forEach((s) => {
-                const key = listGrouping === "month"
-                  ? `Week of ${format(startOfWeek(parseISO(s.date)), "MMM d")}`
-                  : s.date;
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key)!.push(s);
-              });
-              return (
-                <div className="divide-y divide-surface-border">
-                  {Array.from(groups.entries()).map(([groupKey, groupSubs]) => (
-                    <div key={groupKey}>
-                      {/* Group header */}
-                      <div className="px-4 py-2 bg-surface-subtle/70 border-b border-surface-border">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                          {listGrouping === "day"
-                            ? format(parseISO(groupKey), "EEEE, MMMM d, yyyy")
-                            : listGrouping === "week"
-                              ? format(parseISO(groupKey), "EEEE, MMMM d")
-                              : groupKey}
-                        </p>
+            <div className="divide-y divide-surface-border">
+              {/* Summary bar */}
+              <div className="flex items-center justify-between gap-2 bg-surface-subtle/60 px-4 py-2.5 sm:px-5">
+                <span className="text-xs font-medium text-ink-muted">
+                  {listItems.length} submission{listItems.length !== 1 ? "s" : ""}
+                  {statusFilter !== "all" && (
+                    <> &mdash; <span className="font-semibold text-ink">{STATUS_META[statusFilter as SubmissionStatus]?.label}</span></>
+                  )}
+                </span>
+                {statusFilter !== "all" && (
+                  <button
+                    onClick={() => setStatusFilter("all")}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+
+              {listGroups.map(([date, subs]) => {
+                const parsedDate = parseISO(date);
+                const isT = isSameDay(parsedDate, today);
+                return (
+                  <div key={date}>
+                    {/* Date group header */}
+                    <div className={cn(
+                      "flex items-center gap-3 border-b border-surface-border px-4 py-2 sm:px-5",
+                      isT ? "bg-primary/5" : "bg-surface-subtle/40"
+                    )}>
+                      <div className={cn(
+                        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums",
+                        isT ? "bg-primary text-white" : "bg-white border border-surface-border text-ink"
+                      )}>
+                        {format(parsedDate, "d")}
                       </div>
-                      <ul className="divide-y divide-surface-border">
-                        {groupSubs.map((s) => {
-                          const isT = isSameDay(parseISO(s.date), new Date());
-                          return (
-                            <li key={s.id}
-                              className="flex items-start gap-4 px-4 py-4 transition-colors hover:bg-surface-subtle/60 sm:px-5">
-                              <div className="w-12 flex-shrink-0 text-center">
-                                <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted">
-                                  {format(parseISO(s.date), "MMM")}
-                                </div>
-                                <div className={cn(
-                                  "mx-auto mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold",
-                                  isT ? "bg-primary text-white" : "bg-surface-subtle text-ink",
-                                )}>
-                                  {format(parseISO(s.date), "d")}
-                                </div>
-                                <div className="mt-0.5 text-[10px] text-ink-soft">
-                                  {format(parseISO(s.date), "EEE")}
-                                </div>
+                      <div>
+                        <p className={cn(
+                          "text-xs font-semibold",
+                          isT ? "text-primary" : "text-ink"
+                        )}>
+                          {format(parsedDate, "EEEE, MMMM d, yyyy")}
+                          {isT && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Today</span>}
+                        </p>
+                        {isAllMode && (
+                          <p className="mt-0.5 text-[10px] text-ink-muted">
+                            {subs.length} submission{subs.length !== 1 ? "s" : ""} · {new Set(subs.map(s => s.userId)).size} employee{new Set(subs.map(s => s.userId)).size !== 1 ? "s" : ""}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Submission rows */}
+                    <ul className="divide-y divide-surface-border/60">
+                      {subs.map((s) => {
+                        const submitter = isAllMode ? users.find((u) => u.id === s.userId) : null;
+                        return (
+                          <li
+                            key={s.id}
+                            className="flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-surface-subtle/50 sm:gap-4 sm:px-5"
+                          >
+                            {/* Left: employee avatar (all mode) or time */}
+                            {isAllMode && submitter ? (
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-surface-border bg-surface-subtle text-[11px] font-semibold text-ink-muted">
+                                {submitter.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className={cn(
-                                    "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium",
-                                    STATUS_CHIP[s.status],
-                                  )}>
-                                    <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status])} />
-                                    {STATUS_META[s.status].label}
+                            ) : (
+                              <div className="w-10 flex-shrink-0 pt-0.5 text-center">
+                                {s.submittedAt && (
+                                  <span className="text-[11px] tabular-nums text-ink-muted">
+                                    {format(new Date(s.submittedAt), "h:mm a")}
                                   </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Content */}
+                            <div className="min-w-0 flex-1">
+                              {isAllMode && submitter && (
+                                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                  <span className="text-xs font-semibold text-ink">{submitter.name}</span>
                                   {s.submittedAt && (
-                                    <span className="text-xs text-ink-soft">
+                                    <span className="text-[10px] text-ink-soft">
                                       {format(new Date(s.submittedAt), "h:mm a")}
                                     </span>
                                   )}
                                 </div>
-                                {s.workSummary && (
-                                  <p className="mt-1.5 truncate text-sm font-medium text-ink">{s.workSummary}</p>
-                                )}
-                                {s.tasksDetails && (
-                                  <p className="mt-0.5 line-clamp-2 text-xs text-ink-muted">{s.tasksDetails}</p>
+                              )}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={cn(
+                                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium",
+                                  STATUS_CHIP[s.status]
+                                )}>
+                                  <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status])} />
+                                  {STATUS_META[s.status].label}
+                                </span>
+                                {s.versionNumber > 1 && (
+                                  <span className="rounded border border-surface-border bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+                                    v{s.versionNumber}
+                                  </span>
                                 )}
                               </div>
-                              <Button size="sm" variant="ghost" className="flex-shrink-0 text-ink-muted hover:text-ink"
-                                onClick={() => setModal(s)}>
-                                View
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()
+                              {s.workSummary && (
+                                <p className="mt-1.5 line-clamp-2 text-sm text-ink">{s.workSummary}</p>
+                              )}
+                              {s.tasksDetails && (
+                                <p className="mt-0.5 line-clamp-1 text-xs text-ink-muted">{s.tasksDetails}</p>
+                              )}
+                            </div>
+
+                            {/* View button */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 flex-shrink-0 px-2 text-xs text-ink-muted hover:text-ink"
+                              onClick={() => setModal(s)}
+                            >
+                              View
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </Card>
       )}
@@ -652,7 +734,7 @@ export default function CalendarPage() {
         allEmployeeIds={allEmployeeIds}
         submissions={submissions}
         totalEmployees={allActiveEmployees.length}
-        canOverride={canOverride}
+        canOverride={canSelect}
         departments={departments}
       />
     </div>
