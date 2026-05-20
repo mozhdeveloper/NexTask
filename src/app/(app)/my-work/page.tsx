@@ -16,7 +16,7 @@ import { submissionService } from "@/services/submission.service";
 import { toast } from "sonner";
 import {
   Play, CheckCircle2, Clock3, RotateCcw, Pencil, AlertCircle,
-  CalendarDays, FileCheck2, ArrowUpRight, Timer, FileText, UploadCloud,
+  CalendarDays, FileCheck2, ArrowUpRight, Timer, FileText, UploadCloud, RefreshCw,
 } from "lucide-react";
 import { workSettingsService } from "@/services/workSettings.service";
 import { RevisionRequestModal } from "@/components/modals/RevisionRequestModal";
@@ -73,6 +73,7 @@ export default function MyWorkPage() {
   const started = !!todaySub?.startedAt;
   const finished = !!todaySub?.submittedAt;
   const locked = !!todaySub?.locked;
+  const revisionApproved = finished && !locked && todaySub?.status === "revision_approved";
 
   const isMissingToday =
     isToday &&
@@ -126,6 +127,8 @@ export default function MyWorkPage() {
 
   // ── Status styling helpers ──────────────────────────────────────────────
   const statusMeta = (() => {
+    if (revisionApproved)
+      return { label: "Revision approved — re-upload pending", color: "bg-emerald-50 border-emerald-200 text-emerald-700", dot: "bg-emerald-500 animate-pulse" };
     if (finished && locked) {
       const s = todaySub.status;
       if (s === "revision_requested")
@@ -160,6 +163,7 @@ export default function MyWorkPage() {
       <Card className={cn(
         "overflow-hidden",
         finished && locked && "border-emerald-200",
+        revisionApproved && "border-emerald-300",
         started && !finished && "border-primary/30",
         isMissingToday && "border-rose-200",
       )}>
@@ -167,7 +171,7 @@ export default function MyWorkPage() {
           {/* Top accent strip */}
           <div className={cn(
             "h-1 w-full",
-            finished && locked ? "bg-emerald-400" : started ? "bg-primary" : isMissingToday ? "bg-rose-400" : "bg-surface-border",
+            finished && locked ? "bg-emerald-400" : revisionApproved ? "bg-emerald-300" : started ? "bg-primary" : isMissingToday ? "bg-rose-400" : "bg-surface-border",
           )} />
 
           <div className="px-6 py-5">
@@ -323,6 +327,41 @@ export default function MyWorkPage() {
                       <RotateCcw className="h-3.5 w-3.5" /> Reset day
                     </Button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── STATE: Revision approved — re-upload ── */}
+            {revisionApproved && todaySub && (
+              <div className="mt-5 space-y-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                      <RefreshCw className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-emerald-700">Revision approved — re-upload your work</p>
+                      <p className="mt-1 text-xs text-ink-muted">
+                        Your revision request was approved. Upload your updated files and revised description below.
+                        Once re-submitted, the submission will be locked again.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => setSubmitOpen(true)} className="gap-1.5">
+                    <UploadCloud className="h-4 w-4" />
+                    Re-upload submission
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setDetailSub(todaySub); setDetailOpen(true); }}
+                    className="gap-1.5"
+                  >
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                    View current submission
+                  </Button>
                 </div>
               </div>
             )}

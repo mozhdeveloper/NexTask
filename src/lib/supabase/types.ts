@@ -13,7 +13,7 @@ export type DbSubmissionStatus =
   | "revision_rejected"
   | "locked"
   | "excused";
-export type DbRevisionStatus = "pending" | "approved" | "rejected";
+export type DbRevisionStatus = "pending" | "approved" | "rejected" | "resubmitted";
 export type DbProjectStatus = "planning" | "in_progress" | "review" | "completed" | "on_hold";
 export type DbBackupStatus = "running" | "completed" | "failed";
 export type DbNotificationType = "info" | "success" | "warning" | "danger";

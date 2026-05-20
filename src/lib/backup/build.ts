@@ -79,6 +79,17 @@ type DbAttachment = {
   size_bytes: number;
   mime: string;
 };
+type DbRevision = {
+  id: string;
+  submission_id: string;
+  user_id: string;
+  reason: string;
+  status: string;
+  admin_id: string | null;
+  admin_note: string | null;
+  created_at: string;
+  decided_at: string | null;
+};
 
 /**
  * Builds the backup zip, uploads it to the `backups` bucket, and returns metadata.
@@ -125,6 +136,14 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
     const arr = attBySubmission.get(a.submission_id) ?? [];
     arr.push(a);
     attBySubmission.set(a.submission_id, arr);
+  }
+
+  // Group revisions by submission_id
+  const revsBySubmission = new Map<string, DbRevision[]>();
+  for (const rev of snapshot.revisions as DbRevision[]) {
+    const arr = revsBySubmission.get(rev.submission_id) ?? [];
+    arr.push(rev);
+    revsBySubmission.set(rev.submission_id, arr);
   }
 
   // ── 3. Pick the submissions to include in /employees ──────────────────
@@ -181,6 +200,15 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
         originalName: a.original_name,
         sizeBytes:    a.size_bytes,
         mime:         a.mime,
+      })),
+      isRevision:          sub.version_number > 1,
+      revisionHistory: (revsBySubmission.get(sub.id) ?? []).map((r) => ({
+        id:          r.id,
+        status:      r.status,
+        reason:      r.reason,
+        adminNote:   r.admin_note,
+        requestedAt: r.created_at,
+        decidedAt:   r.decided_at,
       })),
     };
     zip.file(`${folder}/description.json`, JSON.stringify(description, null, 2));
@@ -250,6 +278,7 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
     ...Object.entries(rowCounts).map(([t, n]) => `  ${t.padEnd(20)} ${n}`),
     ``,
     `Submissions in /employees: ${targetSubs.length}`,
+    `Revisions in snapshot:     ${(snapshot.revisions as DbRevision[]).length} (${(snapshot.revisions as DbRevision[]).filter((r) => r.status === "approved").length} approved, ${(snapshot.revisions as DbRevision[]).filter((r) => r.status === "resubmitted").length} resubmitted)`,
     `Attachments included:      ${attachmentCount} files (${(attachmentBytes / 1024 / 1024).toFixed(2)} MB)`,
     `Attachments skipped:       ${attachmentSkipped} (download errors)`,
     ``,

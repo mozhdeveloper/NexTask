@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useAuth, useRequireRole } from "@/hooks/useAuth";
@@ -25,6 +26,7 @@ const PAGE_SIZE = 20;
 export default function MySubmissionsPage() {
   const { ready } = useRequireRole(["employee"]);
   const user = useAuth();
+  const router = useRouter();
   const submissions = useDataStore((s) => s.submissions);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<SubmissionStatus | "all">("all");
@@ -109,7 +111,12 @@ export default function MySubmissionsPage() {
                         <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent>
                           <DropdownMenuItem onClick={() => { setSelected(s); setOpen(true); }}>View details</DropdownMenuItem>
-                          {s.locked && !["revision_requested","revision_rejected"].includes(s.status) && (
+                          {s.status === "revision_approved" && !s.locked && (
+                            <DropdownMenuItem onClick={() => router.push(`/my-work?date=${s.date}`)}>
+                              Re-upload revised submission
+                            </DropdownMenuItem>
+                          )}
+                          {s.locked && !["revision_requested","revision_rejected","revision_approved"].includes(s.status) && (
                             <DropdownMenuItem onClick={() => { setRevFor(s.id); setRevOpen(true); }}>Request revision</DropdownMenuItem>
                           )}
                         </DropdownMenuContent>

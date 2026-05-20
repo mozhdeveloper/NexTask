@@ -214,8 +214,39 @@ export const submissionService = {
       targetId: sub.id,
     });
 
+    // ── Close the revision cycle if this is a revision re-upload ──────────
+    // When the employee re-uploads after an approved revision, mark the
+    // revision as "resubmitted" so admins know the cycle is complete.
+    if (existing?.status === "revision_approved") {
+      const { revisions, setRevisions } = useDataStore.getState();
+      const resubmittedAt = nowISO();
+      const approvedRev = revisions.find(
+        (r) => r.submissionId === sub.id && r.status === "approved"
+      );
+      if (approvedRev) {
+        setRevisions(
+          revisions.map((r) =>
+            r.id === approvedRev.id ? { ...r, status: "resubmitted", resubmittedAt } : r
+          )
+        );
+        const { error: revErr } = await supabase
+          .from("revisions")
+          .update({ status: "resubmitted", decided_at: resubmittedAt })
+          .eq("id", approvedRev.id);
+        if (revErr) warn("revision.resubmit", revErr);
+
+        logService.append({
+          userId: me.id,
+          action: "revision.resubmit",
+          targetType: "revision",
+          targetId: approvedRev.id,
+        });
+      }
+    }
+
     // Notify admins and managers; use "warning" for late submissions.
     const isLate = status === "late";
+    const isRevision = (existing?.versionNumber ?? 0) >= 1;
     users
       .filter((u) => u.role === "admin" || u.role === "manager")
       .forEach((recipient) => {
@@ -223,9 +254,15 @@ export const submissionService = {
         notificationService.push({
           userId: recipient.id,
           type: isLate ? "warning" : "info",
-          title: isLate ? "Late submission received" : "New submission received",
+          title: isLate
+            ? "Late submission received"
+            : isRevision
+            ? "Revised submission received"
+            : "New submission received",
           body: isLate
             ? `${me.name} submitted "${type.name}" for ${input.date} past the deadline.`
+            : isRevision
+            ? `${me.name} re-uploaded a revised submission for "${type.name}" on ${input.date}.`
             : `${me.name} submitted "${type.name}" for ${input.date}.`,
           link,
         });

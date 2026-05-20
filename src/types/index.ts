@@ -71,11 +71,13 @@ export interface RevisionRequest {
   submissionId: ID;
   userId: ID;
   reason: string;
-  status: "pending" | "approved" | "rejected";
+  /** pending → approved/rejected → resubmitted (employee acted on the approval) */
+  status: "pending" | "approved" | "rejected" | "resubmitted";
   adminId?: ID;
   adminNote?: string;
   createdAt: string;
   decidedAt?: string;
+  resubmittedAt?: string; // ISO — set when employee re-uploads after approval
 }
 
 export interface ActivityLog {

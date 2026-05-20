@@ -2,7 +2,7 @@
 import { useMemo, useState, useEffect } from "react";
 import {
   Clock, CheckCircle2, XCircle, Search, MessageSquare,
-  CalendarDays,
+  CalendarDays, RefreshCw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -61,6 +61,19 @@ const TAB_CONFIG = {
     emptyTitle: "No rejected requests",
     emptyDesc: "Rejected revision requests will appear here.",
   },
+  resubmitted: {
+    label: "Resubmitted",
+    Icon: RefreshCw,
+    badgeVariant: "success" as const,
+    dot: "bg-teal-500",
+    bg: "bg-teal-50",
+    text: "text-teal-700",
+    border: "border-teal-200",
+    iconBg: "bg-teal-100",
+    iconText: "text-teal-600",
+    emptyTitle: "No resubmitted requests",
+    emptyDesc: "Revisions where employees have re-uploaded their corrected work will appear here.",
+  },
 } as const;
 
 type Tab = keyof typeof TAB_CONFIG;
@@ -90,6 +103,7 @@ export default function RevisionsPage() {
     pending: revisions.filter((r) => r.status === "pending"),
     approved: revisions.filter((r) => r.status === "approved"),
     rejected: revisions.filter((r) => r.status === "rejected"),
+    resubmitted: revisions.filter((r) => r.status === "resubmitted"),
   }), [revisions]);
 
   const filtered = useMemo(() => {
@@ -125,8 +139,8 @@ export default function RevisionsPage() {
       />
 
       {/* Stat cards — click to switch tab */}
-      <div className="grid grid-cols-3 gap-3">
-        {(["pending", "approved", "rejected"] as const).map((t) => {
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(["pending", "approved", "rejected", "resubmitted"] as const).map((t) => {
           const cfg = TAB_CONFIG[t];
           const active = tab === t;
           return (

@@ -162,6 +162,8 @@ export function SubmitWorkModal({
     }
   };
 
+  const isRevisionReupload = !locked && existing?.status === "revision_approved";
+
   const elapsed =
     existing?.startedAt && !existing.submittedAt
       ? formatElapsed(new Date(existing.startedAt), new Date())
@@ -175,7 +177,13 @@ export function SubmitWorkModal({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <DialogTitle className="text-base font-semibold text-ink">
-                {locked ? "Submission locked" : existing?.workSummary ? "Update submission" : "Submit daily work"}
+                {locked
+                  ? "Submission locked"
+                  : isRevisionReupload
+                  ? "Re-upload revised submission"
+                  : existing?.workSummary
+                  ? "Update submission"
+                  : "Submit daily work"}
               </DialogTitle>
               <DialogDescription className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-ink-muted">
                 <span>
@@ -239,6 +247,17 @@ export function SubmitWorkModal({
             </div>
           ) : (
             <div className="space-y-0 divide-y divide-surface-border">
+
+              {/* ── Revision re-upload notice ── */}
+              {isRevisionReupload && (
+                <div className="border-b border-emerald-200 bg-emerald-50/60 px-6 py-3">
+                  <p className="text-sm font-semibold text-emerald-700">Revision re-upload</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    Your revision request was approved. Upload your corrected files and updated work summary below.
+                    Once submitted, this entry will be locked again.
+                  </p>
+                </div>
+              )}
 
               {/* Submission type — only shown if multiple types & not locked */}
               {availableTypes.length > 1 && (
