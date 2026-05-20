@@ -124,7 +124,7 @@ export function ProjectDetailsModal({
         {/* Status colour stripe */}
         <div className={cn("h-1 w-full flex-shrink-0 rounded-t-lg", sc.stripe)} />
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 px-6 pt-5">
             <DialogHeader className="flex-1 space-y-1">
