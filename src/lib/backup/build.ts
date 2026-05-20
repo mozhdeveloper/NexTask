@@ -128,9 +128,23 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
   }
 
   // ── 3. Pick the submissions to include in /employees ──────────────────
-  const targetSubs = opts.attachmentsForDate
-    ? submissions.filter((s) => s.date === opts.attachmentsForDate)
-    : submissions;
+  // If the date filter yields zero, fall back to ALL submissions so the
+  // backup is never empty — surface the reason in the manifest.
+  let targetSubs: DbSubmission[];
+  let dateFilterNote: string;
+  if (opts.attachmentsForDate) {
+    const filtered = submissions.filter((s) => s.date === opts.attachmentsForDate);
+    if (filtered.length > 0) {
+      targetSubs = filtered;
+      dateFilterNote = opts.attachmentsForDate;
+    } else {
+      targetSubs = submissions;
+      dateFilterNote = `${opts.attachmentsForDate} — no matches, fell back to ALL submissions`;
+    }
+  } else {
+    targetSubs = submissions;
+    dateFilterNote = "all dates";
+  }
 
   // ── 4. Pre-flatten the file list so we can batch downloads ────────────
   type Entry = { sub: DbSubmission; att: DbAttachment; folder: string };
@@ -215,13 +229,22 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
   }
 
   // ── 6. Manifest ────────────────────────────────────────────────────────
+  // Always ensure /employees folder exists in the ZIP (even if no subs today).
+  if (targetSubs.length === 0) {
+    zip.file(
+      "employees/README.txt",
+      "No employee submissions matched the requested date window.\n" +
+        "See manifest.txt for details.\n",
+    );
+  }
+
   const lines: string[] = [
     `NexTask Backup`,
     `===============`,
     `Generated:        ${startedAt.toISOString()}`,
     `Generated local:  ${startedAt.toLocaleString()}`,
     `Triggered by:     ${opts.triggeredBy ?? "manual"}`,
-    `Attachments for:  ${opts.attachmentsForDate ?? "all dates"}`,
+    `Attachments for:  ${dateFilterNote}`,
     ``,
     `Row counts:`,
     ...Object.entries(rowCounts).map(([t, n]) => `  ${t.padEnd(20)} ${n}`),
