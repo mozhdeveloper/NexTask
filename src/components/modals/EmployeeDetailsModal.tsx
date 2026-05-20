@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { useDataStore } from "@/store/dataStore";
 import { initials } from "@/lib/status";
 import { fmtDate, fmtTime } from "@/lib/dates";
-import { Mail, Briefcase, Building2, CalendarDays, Pencil } from "lucide-react";
+import { Mail, Briefcase, Building2, CalendarDays, Pencil, X } from "lucide-react";
 import type { User, Submission } from "@/types";
 import { SubmissionDetailsModal } from "./SubmissionDetailsModal";
 
@@ -59,7 +59,7 @@ export function EmployeeDetailsModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent hideClose className="max-w-full sm:max-w-2xl max-h-[90vh] overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           <DialogHeader>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -78,6 +78,11 @@ export function EmployeeDetailsModal({
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
+                <DialogClose asChild>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground" aria-label="Close">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </DialogClose>
               </div>
             </div>
           </DialogHeader>
