@@ -12,7 +12,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:all": "vitest run",
     "test:watch": "vitest src/test/unit",
-    "test:coverage": "vitest run --coverage src/test/unit"
+    "test:coverage": "vitest run --coverage src/test/unit",
+    "test:backup": "node scripts/test-backup.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
