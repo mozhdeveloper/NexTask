@@ -60,21 +60,24 @@ import { buildBackupZip, downloadBackupZip, signedBackupUrl } from "@/lib/backup
 beforeEach(() => {
   state.tables = {
     users: [
-      { id: "u1", name: "Alice Smith" },
-      { id: "u2", name: "Bob/Weird*Name" },
+      { id: "u1", name: "Alice Smith", email: "alice@x.com", role: "employee", department_id: "d1", job_title: "Engineer" },
+      { id: "u2", name: "Bob/Weird*Name", email: "bob@x.com", role: "employee", department_id: "d1", job_title: null },
     ],
     departments: [{ id: "d1", name: "Eng" }],
-    submission_types: [],
+    submission_types: [
+      { id: "t1", name: "Daily Report" },
+      { id: "t2", name: "Weekly Summary" },
+    ],
     submissions: [
-      { id: "s1", user_id: "u1", date: "2026-05-20" },
-      { id: "s2", user_id: "u2", date: "2026-05-19" },
-      { id: "s3", user_id: "u1", date: "2026-05-20" },
+      { id: "s1", user_id: "u1", submission_type_id: "t1", date: "2026-05-20", work_summary: "Built feature A", tasks_details: "- task 1\n- task 2", status: "submitted", locked: false, submitted_at: "2026-05-20T10:00:00Z", version_number: 1 },
+      { id: "s2", user_id: "u2", submission_type_id: "t1", date: "2026-05-19", work_summary: "Bug fixes",       tasks_details: "fixes",         status: "submitted", locked: false, submitted_at: "2026-05-19T10:00:00Z", version_number: 1 },
+      { id: "s3", user_id: "u1", submission_type_id: "t2", date: "2026-05-20", work_summary: "Wrote tests",     tasks_details: "tests",         status: "submitted", locked: false, submitted_at: "2026-05-20T11:00:00Z", version_number: 1 },
     ],
     attachments: [
-      { storage_path: "u1/s1/file.pdf", original_name: "report.pdf", submission_id: "s1", size_bytes: 100 },
-      { storage_path: "u2/s2/old.pdf",  original_name: "old.pdf",    submission_id: "s2", size_bytes: 50 },
-      { storage_path: "u1/s3/img.png",  original_name: "img.png",    submission_id: "s3", size_bytes: 75 },
-      { storage_path: null, original_name: "missing.txt", submission_id: "s1", size_bytes: 0 },
+      { id: "a1", storage_path: "u1/s1/file.pdf", original_name: "report.pdf", submission_id: "s1", size_bytes: 100, mime: "application/pdf" },
+      { id: "a2", storage_path: "u2/s2/old.pdf",  original_name: "old.pdf",    submission_id: "s2", size_bytes: 50,  mime: "application/pdf" },
+      { id: "a3", storage_path: "u1/s3/img.png",  original_name: "img.png",    submission_id: "s3", size_bytes: 75,  mime: "image/png" },
+      { id: "a4", storage_path: null, original_name: "missing.txt", submission_id: "s1", size_bytes: 0, mime: "text/plain" },
     ],
     revisions: [],
     projects: [],
@@ -126,7 +129,7 @@ describe("buildBackupZip — core pipeline", () => {
     expect(json.attachments).toHaveLength(4);
   });
 
-  it("filters attachments to the requested date and sanitizes file paths", async () => {
+  it("organises attachments into employees/<name>/<date>__<type>/ folders with description.json", async () => {
     const result = await buildBackupZip({ attachmentsForDate: "2026-05-20" });
 
     expect(result.attachmentCount).toBe(2);
@@ -135,17 +138,35 @@ describe("buildBackupZip — core pipeline", () => {
     );
 
     const zip = await JSZip.loadAsync(state.uploadCalls[0].body);
-    expect(zip.file("attachments/Alice_Smith/2026-05-20__report.pdf")).not.toBeNull();
-    expect(zip.file("attachments/Alice_Smith/2026-05-20__img.png")).not.toBeNull();
-    // Bob's file is on 2026-05-19 — excluded.
-    expect(zip.file("attachments/Bob_Weird_Name/2026-05-19__old.pdf")).toBeNull();
-    // null storage_path attachment is excluded.
-    expect(zip.file(/missing\.txt/)).toHaveLength(0);
+
+    // Files written 1:1 with original names (sanitized), under per-employee/per-submission folders
+    expect(zip.file("employees/Alice_Smith/2026-05-20__Daily_Report/report.pdf")).not.toBeNull();
+    expect(zip.file("employees/Alice_Smith/2026-05-20__Weekly_Summary/img.png")).not.toBeNull();
+
+    // description.json present for each filtered submission with task details
+    const descRaw = await zip.file("employees/Alice_Smith/2026-05-20__Daily_Report/description.json")!.async("string");
+    const desc = JSON.parse(descRaw);
+    expect(desc.submissionId).toBe("s1");
+    expect(desc.employee.name).toBe("Alice Smith");
+    expect(desc.employee.department).toBe("Eng");
+    expect(desc.submissionType).toBe("Daily Report");
+    expect(desc.taskDescription.workSummary).toBe("Built feature A");
+    expect(desc.taskDescription.tasksDetails).toContain("task 1");
+    expect(desc.files).toEqual([
+      { originalName: "report.pdf", sizeBytes: 100, mime: "application/pdf" },
+    ]);
+
+    // Bob's submission is on 2026-05-19 — excluded from the filtered date.
+    expect(zip.file("employees/Bob_Weird_Name/2026-05-19__Daily_Report/old.pdf")).toBeNull();
+    expect(zip.file("employees/Bob_Weird_Name/2026-05-19__Daily_Report/description.json")).toBeNull();
   });
 
   it("includes all attachments when attachmentsForDate is omitted", async () => {
     const result = await buildBackupZip();
     expect(result.attachmentCount).toBe(3);
+    const zip = await JSZip.loadAsync(state.uploadCalls[0].body);
+    // Bob's file should now be present
+    expect(zip.file("employees/Bob_Weird_Name/2026-05-19__Daily_Report/old.pdf")).not.toBeNull();
   });
 
   it("downloads employee files from the submissions bucket, not the backups bucket", async () => {
@@ -162,8 +183,8 @@ describe("buildBackupZip — core pipeline", () => {
 
     const zip = await JSZip.loadAsync(state.uploadCalls[0].body);
     const manifest = await zip.file("manifest.txt")!.async("string");
-    expect(manifest).toContain("Attachments included: 1");
-    expect(manifest).toContain("Attachments skipped:  1");
+    expect(manifest).toContain("Attachments included:      1");
+    expect(manifest).toContain("Attachments skipped:       1");
     expect(manifest).toContain("Triggered by:");
   });
 

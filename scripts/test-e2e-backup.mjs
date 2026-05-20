@@ -72,7 +72,7 @@ async function resendSend(payload) {
   });
 }
 
-// ── Core: build the zip ───────────────────────────────────────────────────────
+// ── Core: build the zip (mirrors src/lib/backup/build.ts — per-employee layout) ──
 async function buildZip({ triggeredBy = "test", attachmentsForDate = null, label = "" }) {
   const startedAt = new Date();
   const zip = new JSZip();
@@ -90,37 +90,88 @@ async function buildZip({ triggeredBy = "test", attachmentsForDate = null, label
   zip.file("data.json", JSON.stringify(snapshot, null, 2));
 
   const usersById = new Map(snapshot.users.map(u => [u.id, u]));
+  const deptsById = new Map((snapshot.departments ?? []).map(d => [d.id, d]));
+  const typesById = new Map((snapshot.submission_types ?? []).map(t => [t.id, t]));
   const subsById  = new Map(snapshot.submissions.map(s => [s.id, s]));
-  const allAtts   = (snapshot.attachments ?? []).filter(a => a.storage_path);
-  const want = attachmentsForDate
-    ? allAtts.filter(a => { const s = subsById.get(a.submission_id); return s && s.date === attachmentsForDate; })
-    : allAtts;
-  info(`${want.length} attachment(s) to include (${attachmentsForDate ?? "all dates"})`);
+  const attBySub  = new Map();
+  for (const a of (snapshot.attachments ?? [])) {
+    if (!attBySub.has(a.submission_id)) attBySub.set(a.submission_id, []);
+    attBySub.get(a.submission_id).push(a);
+  }
 
-  let attachmentCount = 0, attachmentBytes = 0;
+  const targetSubs = attachmentsForDate
+    ? snapshot.submissions.filter(s => s.date === attachmentsForDate)
+    : snapshot.submissions;
+  info(`${targetSubs.length} submission(s) to include (${attachmentsForDate ?? "all dates"})`);
+
+  // 1) Write description.json + queue file downloads per-submission
+  const downloadQueue = []; // { folder, fileName, storage_path }
+  let submissionsWithFolders = 0;
+  for (const sub of targetSubs) {
+    const user = usersById.get(sub.user_id);
+    if (!user) continue;
+    const dept = user.department_id ? deptsById.get(user.department_id) : null;
+    const type = sub.submission_type_id ? typesById.get(sub.submission_type_id) : null;
+    const typeName = sanitize(type?.name ?? "submission");
+    const folder = `employees/${sanitize(user.name ?? "unknown")}/${sub.date ?? "no-date"}__${typeName}${sub.version_number > 1 ? `_v${sub.version_number}` : ""}`;
+
+    const atts = (attBySub.get(sub.id) ?? []).filter(a => a.storage_path);
+    const description = {
+      submissionId: sub.id,
+      date: sub.date,
+      employee: {
+        id: user.id,
+        name: user.name,
+        email: user.email ?? null,
+        role: user.role ?? null,
+        jobTitle: user.job_title ?? null,
+        department: dept?.name ?? null,
+      },
+      submissionType: type?.name ?? null,
+      status: sub.status ?? null,
+      locked: sub.locked ?? false,
+      submittedAt: sub.submitted_at ?? null,
+      versionNumber: sub.version_number ?? 1,
+      taskDescription: {
+        workSummary: sub.work_summary ?? "",
+        tasksDetails: sub.tasks_details ?? "",
+      },
+      files: atts.map(a => ({ originalName: a.original_name, sizeBytes: a.size_bytes, mime: a.mime ?? null })),
+    };
+    zip.file(`${folder}/description.json`, JSON.stringify(description, null, 2));
+    submissionsWithFolders++;
+
+    // Detect filename collisions within the same submission
+    const seen = new Map();
+    for (const a of atts) {
+      const base = sanitize(a.original_name) || "untitled";
+      const count = (seen.get(base) ?? 0) + 1;
+      seen.set(base, count);
+      const fileName = count === 1 ? base : `${a.id.slice(-6)}__${base}`;
+      downloadQueue.push({ folder, fileName, storage_path: a.storage_path });
+    }
+  }
+
+  // 2) Download files in parallel batches
+  let attachmentCount = 0, attachmentBytes = 0, attachmentSkipped = 0;
   const BATCH = 6;
-  for (let i = 0; i < want.length; i += BATCH) {
-    const results = await Promise.all(want.slice(i, i + BATCH).map(async a => {
+  for (let i = 0; i < downloadQueue.length; i += BATCH) {
+    const results = await Promise.all(downloadQueue.slice(i, i + BATCH).map(async q => {
       try {
-        const { data, error } = await sb.storage.from(SUBMISSIONS_BUCKET).download(a.storage_path);
-        if (error || !data) return { a, ok: false, err: error?.message ?? "no data" };
-        return { a, ok: true, buf: Buffer.from(await data.arrayBuffer()) };
-      } catch (e) { return { a, ok: false, err: e.message }; }
+        const { data, error } = await sb.storage.from(SUBMISSIONS_BUCKET).download(q.storage_path);
+        if (error || !data) return { q, ok: false, err: error?.message ?? "no data" };
+        return { q, ok: true, buf: Buffer.from(await data.arrayBuffer()) };
+      } catch (e) { return { q, ok: false, err: e.message }; }
     }));
     for (const r of results) {
-      if (!r.ok) { info(`  ⚠ SKIP ${r.a.storage_path}: ${r.err}`); continue; }
-      const sub    = subsById.get(r.a.submission_id);
-      const user   = sub ? usersById.get(sub.user_id) : undefined;
-      const folder = sanitize(user?.name ?? "unknown_user");
-      const date   = sub?.date ?? "no-date";
-      zip.file(`attachments/${folder}/${date}__${sanitize(r.a.original_name)}`, r.buf);
+      if (!r.ok) { info(`  ⚠ SKIP ${r.q.storage_path}: ${r.err}`); attachmentSkipped++; continue; }
+      zip.file(`${r.q.folder}/${r.q.fileName}`, r.buf);
       attachmentCount++;
       attachmentBytes += r.buf.length;
     }
   }
   info(`${attachmentCount} attachment(s) downloaded (${mb(attachmentBytes)} MB)`);
 
-  const skipped = want.length - attachmentCount;
   const lines = [
     `NexTask Backup${label ? " — " + label : ""}`,
     "=".repeat(50),
@@ -132,8 +183,15 @@ async function buildZip({ triggeredBy = "test", attachmentsForDate = null, label
     "Row counts:",
     ...Object.entries(rowCounts).map(([t,n]) => `  ${t.padEnd(22)} ${n}`),
     "",
-    `Attachments included: ${attachmentCount} (${mb(attachmentBytes)} MB)`,
-    `Attachments skipped:  ${skipped}`,
+    `Submissions in /employees: ${submissionsWithFolders}`,
+    `Attachments included:      ${attachmentCount} files (${mb(attachmentBytes)} MB)`,
+    `Attachments skipped:       ${attachmentSkipped}`,
+    "",
+    "Layout:",
+    "  data.json                                          full DB snapshot",
+    "  manifest.txt                                       this file",
+    "  employees/<name>/<date>__<type>/description.json   task description + metadata",
+    "  employees/<name>/<date>__<type>/<original_file>    employee's uploaded files (untouched)",
   ];
   zip.file("manifest.txt", lines.join("\n"));
 

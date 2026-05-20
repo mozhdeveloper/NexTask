@@ -1,9 +1,9 @@
 // Shared backup pipeline used by /api/backups/{run,send,auto}.
 // Builds a ZIP containing:
-//   - data.json    — JSON snapshot of every dynamic table
-//   - manifest.txt — human-readable summary (date, row counts, file count)
-//   - attachments/<userName>/<date>__<fileName> — actual files from Supabase Storage
-//     filtered to TODAY's submissions only (auto/run) or all-in-range for export.
+//   - data.json    — JSON snapshot of every dynamic table (full DB backup)
+//   - manifest.txt — human-readable summary
+//   - employees/<userName>/<date>__<typeName>/description.json
+//                          + every original file the employee uploaded (1:1, untouched)
 // Uploads the ZIP to the `backups` storage bucket and returns the path + size.
 
 import JSZip from "jszip";
@@ -52,8 +52,32 @@ function stamp(d: Date) {
 }
 
 function sanitize(s: string) {
-  return s.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80);
+  return s.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 80) || "untitled";
 }
+
+type DbUser       = { id: string; name: string; email: string; role: string; department_id: string | null; job_title: string | null };
+type DbDept       = { id: string; name: string };
+type DbType       = { id: string; name: string };
+type DbSubmission = {
+  id: string;
+  user_id: string;
+  submission_type_id: string;
+  date: string;
+  work_summary: string;
+  tasks_details: string;
+  status: string;
+  locked: boolean;
+  submitted_at: string | null;
+  version_number: number;
+};
+type DbAttachment = {
+  id: string;
+  submission_id: string;
+  storage_path: string | null;
+  original_name: string;
+  size_bytes: number;
+  mime: string;
+};
 
 /**
  * Builds the backup zip, uploads it to the `backups` bucket, and returns metadata.
@@ -81,61 +105,115 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
   }
   zip.file("data.json", JSON.stringify(snapshot, null, 2));
 
-  // ── 2. Build a userId→name lookup for attachment folder names ─────────
-  const usersById = new Map<string, { name: string }>();
-  for (const u of snapshot.users as Array<{ id: string; name: string }>) {
-    usersById.set(u.id, { name: u.name });
+  // ── 2. Build lookup maps ───────────────────────────────────────────────
+  const usersById = new Map<string, DbUser>();
+  for (const u of snapshot.users as DbUser[]) usersById.set(u.id, u);
+
+  const deptsById = new Map<string, DbDept>();
+  for (const d of snapshot.departments as DbDept[]) deptsById.set(d.id, d);
+
+  const typesById = new Map<string, DbType>();
+  for (const t of snapshot.submission_types as DbType[]) typesById.set(t.id, t);
+
+  const submissions = snapshot.submissions as DbSubmission[];
+  const attachments = (snapshot.attachments as DbAttachment[]).filter((a) => a.storage_path);
+
+  // Group attachments by submission_id
+  const attBySubmission = new Map<string, DbAttachment[]>();
+  for (const a of attachments) {
+    const arr = attBySubmission.get(a.submission_id) ?? [];
+    arr.push(a);
+    attBySubmission.set(a.submission_id, arr);
   }
-  const subsById = new Map<string, { user_id: string; date: string }>();
-  for (const s of snapshot.submissions as Array<{ id: string; user_id: string; date: string }>) {
-    subsById.set(s.id, { user_id: s.user_id, date: s.date });
+
+  // ── 3. Pick the submissions to include in /employees ──────────────────
+  const targetSubs = opts.attachmentsForDate
+    ? submissions.filter((s) => s.date === opts.attachmentsForDate)
+    : submissions;
+
+  // ── 4. Pre-flatten the file list so we can batch downloads ────────────
+  type Entry = { sub: DbSubmission; att: DbAttachment; folder: string };
+  const entries: Entry[] = [];
+  for (const sub of targetSubs) {
+    const user = usersById.get(sub.user_id);
+    const type = typesById.get(sub.submission_type_id);
+    const userFolder   = sanitize(user?.name ?? `user_${sub.user_id}`);
+    const subFolder    = `${sub.date}__${sanitize(type?.name ?? "submission")}${sub.version_number > 1 ? `_v${sub.version_number}` : ""}`;
+    const folder       = `employees/${userFolder}/${subFolder}`;
+
+    // description.json — added immediately, no I/O required
+    const description = {
+      submissionId:    sub.id,
+      date:            sub.date,
+      employee: {
+        id:            user?.id ?? sub.user_id,
+        name:          user?.name ?? "(unknown)",
+        email:         user?.email ?? "",
+        role:          user?.role ?? "",
+        jobTitle:      user?.job_title ?? null,
+        department:    user?.department_id ? deptsById.get(user.department_id)?.name ?? null : null,
+      },
+      submissionType:  type?.name ?? "(unknown)",
+      status:          sub.status,
+      locked:          sub.locked,
+      submittedAt:     sub.submitted_at,
+      versionNumber:   sub.version_number,
+      taskDescription: {
+        workSummary:   sub.work_summary,
+        tasksDetails:  sub.tasks_details,
+      },
+      files: (attBySubmission.get(sub.id) ?? []).map((a) => ({
+        originalName: a.original_name,
+        sizeBytes:    a.size_bytes,
+        mime:         a.mime,
+      })),
+    };
+    zip.file(`${folder}/description.json`, JSON.stringify(description, null, 2));
+
+    // Queue the actual file downloads
+    for (const att of attBySubmission.get(sub.id) ?? []) entries.push({ sub, att, folder });
   }
 
-  // ── 3. Collect attachments to include ──────────────────────────────────
-  type Att = { storage_path: string | null; original_name: string; submission_id: string; size_bytes: number };
-  const allAttachments = (snapshot.attachments as Att[]).filter((a) => a.storage_path);
-
-  const want = opts.attachmentsForDate
-    ? allAttachments.filter((a) => {
-        const sub = subsById.get(a.submission_id);
-        return sub && sub.date === opts.attachmentsForDate;
-      })
-    : allAttachments;
-
-  // ── 4. Download attachments in batches (avoid memory blow-up) ─────────
+  // ── 5. Download attachments in batches (avoid memory blow-up) ─────────
   let attachmentCount = 0;
   let attachmentBytes = 0;
+  let attachmentSkipped = 0;
   const BATCH = 6;
-  for (let i = 0; i < want.length; i += BATCH) {
-    const slice = want.slice(i, i + BATCH);
+  for (let i = 0; i < entries.length; i += BATCH) {
+    const slice = entries.slice(i, i + BATCH);
     const results = await Promise.all(
-      slice.map(async (a) => {
+      slice.map(async (e) => {
         try {
           const { data, error } = await supabaseAdmin.storage
             .from(STORAGE_BUCKET)
-            .download(a.storage_path!);
-          if (error || !data) return { a, ok: false as const, err: error?.message ?? "no data" };
+            .download(e.att.storage_path!);
+          if (error || !data) return { e, ok: false as const, err: error?.message ?? "no data" };
           const buf = Buffer.from(await data.arrayBuffer());
-          return { a, ok: true as const, buf };
-        } catch (e) {
-          return { a, ok: false as const, err: (e as Error).message };
+          return { e, ok: true as const, buf };
+        } catch (err) {
+          return { e, ok: false as const, err: (err as Error).message };
         }
       }),
     );
     for (const r of results) {
-      if (!r.ok) continue;
-      const sub = subsById.get(r.a.submission_id);
-      const user = sub ? usersById.get(sub.user_id) : undefined;
-      const folder = sanitize(user?.name ?? "unknown_user");
-      const dateLabel = sub?.date ?? "no-date";
-      const safeName = sanitize(r.a.original_name);
-      zip.file(`attachments/${folder}/${dateLabel}__${safeName}`, r.buf);
+      if (!r.ok) {
+        attachmentSkipped++;
+        continue;
+      }
+      // Files written 1:1 with their ORIGINAL filename. If two attachments
+      // in the same submission share the same name, prefix with attachment id.
+      const safeName = sanitize(r.e.att.original_name);
+      const targetPath = `${r.e.folder}/${safeName}`;
+      const finalPath = zip.file(targetPath)
+        ? `${r.e.folder}/${r.e.att.id.slice(-6)}__${safeName}` // collision
+        : targetPath;
+      zip.file(finalPath, r.buf);
       attachmentCount++;
       attachmentBytes += r.buf.length;
     }
   }
 
-  // ── 5. Manifest ────────────────────────────────────────────────────────
+  // ── 6. Manifest ────────────────────────────────────────────────────────
   const lines: string[] = [
     `NexTask Backup`,
     `===============`,
@@ -147,8 +225,15 @@ export async function buildBackupZip(opts: BuildOptions = {}): Promise<BuiltBack
     `Row counts:`,
     ...Object.entries(rowCounts).map(([t, n]) => `  ${t.padEnd(20)} ${n}`),
     ``,
-    `Attachments included: ${attachmentCount} files (${(attachmentBytes / 1024 / 1024).toFixed(2)} MB)`,
-    `Attachments skipped:  ${want.length - attachmentCount} (download errors)`,
+    `Submissions in /employees: ${targetSubs.length}`,
+    `Attachments included:      ${attachmentCount} files (${(attachmentBytes / 1024 / 1024).toFixed(2)} MB)`,
+    `Attachments skipped:       ${attachmentSkipped} (download errors)`,
+    ``,
+    `Layout:`,
+    `  data.json                                          full DB snapshot`,
+    `  manifest.txt                                       this file`,
+    `  employees/<name>/<date>__<type>/description.json   task description + metadata`,
+    `  employees/<name>/<date>__<type>/<original_file>    employee's uploaded files (untouched)`,
   ];
   zip.file("manifest.txt", lines.join("\n"));
 
