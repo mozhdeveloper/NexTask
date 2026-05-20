@@ -8,9 +8,10 @@
 
 import JSZip from "jszip";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { STORAGE_BUCKET } from "@/lib/supabase/client";
 
 const BACKUP_BUCKET = process.env.BACKUP_STORAGE_BUCKET ?? "backups";
+// Read directly from env — do NOT import from client.ts ("use client" module)
+const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? "submissions";
 
 const TABLES = [
   "users",
