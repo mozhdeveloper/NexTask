@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, List, FileText, Users,
 } from "lucide-react";
@@ -38,6 +38,9 @@ type ListPeriod = "day" | "week" | "month";
 
 /** Sentinel value meaning "show all employees" in the user picker */
 const ALL_USERS = "__all__";
+
+/** Items shown per "load more" page in the list view */
+const LIST_PAGE_SIZE = 50;
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -243,9 +246,16 @@ export default function CalendarPage() {
   const [view, setView] = useState<CalView>("month");
   const [listPeriod, setListPeriod] = useState<ListPeriod>("month");
   const [listCursor, setListCursor] = useState(() => new Date());
+  const [listLimit, setListLimit] = useState(LIST_PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "all">("all");
 
-  const today = new Date();
+  // Stable reference to today — doesn't change during a session
+  const today = useRef(new Date()).current;
+
+  // Reset render limit whenever the visible window changes
+  useEffect(() => {
+    setListLimit(LIST_PAGE_SIZE);
+  }, [listPeriod, listCursor, statusFilter, viewUserId]);
 
   // ── list navigation ───────────────────────────────────────────────────────
   const listGoBack = () => setListCursor((c) =>
@@ -377,12 +387,25 @@ export default function CalendarPage() {
   const listGroups = useMemo(() => {
     const map = new Map<string, Submission[]>();
     listItems.forEach((s) => {
-      const arr = map.get(s.date) ?? [];
-      arr.push(s);
-      map.set(s.date, arr);
+      const existing = map.get(s.date);
+      if (existing) existing.push(s);
+      else map.set(s.date, [s]);
     });
     return Array.from(map.entries()).sort(([a], [b]) => b.localeCompare(a));
   }, [listItems]);
+
+  // ── paginated groups (cap at listLimit items total) ───────────────────────
+  const { visibleGroups, hiddenCount } = useMemo(() => {
+    let shown = 0;
+    const visible: Array<[string, Submission[]]> = [];
+    for (const [date, subs] of listGroups) {
+      if (shown >= listLimit) break;
+      const take = subs.slice(0, listLimit - shown);
+      visible.push([date, take]);
+      shown += take.length;
+    }
+    return { visibleGroups: visible, hiddenCount: listItems.length - shown };
+  }, [listGroups, listLimit, listItems.length]);
 
   return (
     <div className="space-y-4">
@@ -640,7 +663,7 @@ export default function CalendarPage() {
                 )}
               </div>
 
-              {listGroups.map(([date, subs]) => {
+              {visibleGroups.map(([date, subs]) => {
                 const parsedDate = parseISO(date);
                 const isT = isSameDay(parsedDate, today);
                 return (
@@ -746,6 +769,21 @@ export default function CalendarPage() {
                   </div>
                 );
               })}
+              {hiddenCount > 0 && (
+                <div className="flex items-center justify-between gap-3 border-t border-surface-border px-4 py-3 sm:px-5">
+                  <span className="text-xs text-ink-muted">
+                    Showing {listItems.length - hiddenCount} of {listItems.length} submissions
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setListLimit((l) => l + LIST_PAGE_SIZE)}
+                    className="h-8 text-xs"
+                  >
+                    Load {Math.min(hiddenCount, LIST_PAGE_SIZE)} more
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Card>
