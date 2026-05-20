@@ -1,13 +1,8 @@
-// GET/POST /api/backups/auto — invoked by Vercel Cron (vercel.json: "0 * * * *").
+// GET/POST /api/backups/auto — invoked by Vercel Cron (vercel.json: "0 22 * * *").
 // Vercel Cron sends GET by default; we accept both.
 //
-// Logic:
-//   1. Reject if CRON_SECRET is configured and the request lacks the matching
-//      Authorization header.
-//   2. Read auto-backup settings from Supabase (NOT localStorage).
-//   3. Skip if disabled, already ran today, or before scheduled hour.
-//   4. Build a real ZIP (with today's attachments), upload, log it.
-//   5. Email the configured address via Resend.
+// NOTE: Hobby plan only allows once-per-day crons (22:00 UTC).
+// The route still skips gracefully if auto-backup is disabled or already ran today.
 
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
