@@ -83,7 +83,7 @@ const FILTER_STATUSES: SubmissionStatus[] = [
 // ─── DayCell ─────────────────────────────────────────────────────────────────
 function DayCell({
   d, sub, inMonth, isToday, isPicked, compact, onSelect,
-  submittedCount, totalCount,
+  submittedCount, totalCount, isAllMode,
 }: {
   d: Date;
   sub?: Submission;
@@ -94,6 +94,7 @@ function DayCell({
   onSelect: (d: Date, sub?: Submission) => void;
   submittedCount?: number;
   totalCount?: number;
+  isAllMode?: boolean;
 }) {
   const iso = format(d, "yyyy-MM-dd");
   const holiday = workSettingsService.isHoliday(iso);
@@ -136,17 +137,17 @@ function DayCell({
       {sub && inMonth && (
         <div className={cn(
           "mt-1 hidden items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none sm:inline-flex",
-          STATUS_CHIP[sub.status]
+          STATUS_CHIP[sub.status] ?? "bg-slate-50 text-slate-600 border-slate-200"
         )}>
-          <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[sub.status])} />
+          <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[sub.status] ?? "bg-slate-400")} />
           {compact
-            ? STATUS_META[sub.status].label.split(" ")[0]
-            : STATUS_META[sub.status].label}
+            ? (STATUS_META[sub.status]?.label ?? sub.status).split(" ")[0]
+            : (STATUS_META[sub.status]?.label ?? sub.status)}
         </div>
       )}
       {/* Mobile: just a color dot */}
       {sub && inMonth && compact && (
-        <span className={cn("mt-0.5 h-1.5 w-1.5 rounded-full sm:hidden", STATUS_DOT[sub.status])} />
+        <span className={cn("mt-0.5 h-1.5 w-1.5 rounded-full sm:hidden", STATUS_DOT[sub.status] ?? "bg-slate-400")} />
       )}
 
       {/* Summary preview (full cells only) */}
@@ -156,8 +157,8 @@ function DayCell({
         </p>
       )}
 
-      {/* Submitted / total count badge — only when at least one submitted */}
-      {inMonth && typeof submittedCount === "number" && typeof totalCount === "number" && submittedCount > 0 && (
+      {/* Submitted / total count badge — only in all-mode (admin/manager overview) */}
+      {isAllMode && inMonth && typeof submittedCount === "number" && typeof totalCount === "number" && submittedCount > 0 && (
         <span className={cn(
           "mt-auto inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold leading-none",
           compact ? "hidden sm:inline-flex" : "inline-flex",
@@ -192,8 +193,8 @@ function Legend() {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-surface-border pt-3 mt-4">
       {LEGEND.map((s) => (
         <span key={s} className="flex items-center gap-1.5 text-xs text-ink-muted">
-          <span className={cn("h-2 w-2 rounded-full", STATUS_DOT[s])} />
-          {STATUS_META[s].label}
+          <span className={cn("h-2 w-2 rounded-full", STATUS_DOT[s] ?? "bg-slate-400")} />
+          {STATUS_META[s]?.label ?? s}
         </span>
       ))}
     </div>
@@ -673,8 +674,8 @@ export default function CalendarPage() {
               {FILTER_STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
                   <span className="flex items-center gap-2">
-                    <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", STATUS_DOT[s])} />
-                    {STATUS_META[s].label}
+                    <span className={cn("h-2 w-2 flex-shrink-0 rounded-full", STATUS_DOT[s] ?? "bg-slate-400")} />
+                    {STATUS_META[s]?.label ?? s}
                   </span>
                 </SelectItem>
               ))}
@@ -710,8 +711,9 @@ export default function CalendarPage() {
                     isPicked={!!picked && isSameDay(d, picked)}
                     compact
                     onSelect={handleSelect}
-                    submittedCount={isSameMonth(d, cursor) ? (dayCountMap.get(iso) ?? 0) : undefined}
-                    totalCount={isSameMonth(d, cursor) ? effectiveEmployeeCount : undefined}
+                    isAllMode={isAllMode}
+                    submittedCount={isAllMode && isSameMonth(d, cursor) ? (dayCountMap.get(iso) ?? 0) : undefined}
+                    totalCount={isAllMode && isSameMonth(d, cursor) ? effectiveEmployeeCount : undefined}
                   />
                 );
               })}
@@ -754,8 +756,9 @@ export default function CalendarPage() {
                         isPicked={!!picked && isSameDay(d, picked)}
                         compact={false}
                         onSelect={handleSelect}
-                        submittedCount={dayCountMap.get(iso) ?? 0}
-                        totalCount={effectiveEmployeeCount}
+                        isAllMode={isAllMode}
+                        submittedCount={isAllMode ? (dayCountMap.get(iso) ?? 0) : undefined}
+                        totalCount={isAllMode ? effectiveEmployeeCount : undefined}
                       />
                     </div>
                   );
@@ -877,10 +880,10 @@ export default function CalendarPage() {
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <span className={cn(
                                   "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium",
-                                  STATUS_CHIP[s.status]
+                                  STATUS_CHIP[s.status] ?? "bg-slate-50 text-slate-600 border-slate-200"
                                 )}>
-                                  <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status])} />
-                                  {STATUS_META[s.status].label}
+                                  <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s.status] ?? "bg-slate-400")} />
+                                  {STATUS_META[s.status]?.label ?? s.status}
                                 </span>
                                 {s.versionNumber > 1 && (
                                   <span className="rounded border border-surface-border bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
