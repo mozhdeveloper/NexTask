@@ -1,10 +1,12 @@
 ﻿"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, List, FileText, Users,
+  ChevronLeft, ChevronRight, CalendarDays, LayoutGrid, List,
+  FileText, Users, Search, ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useRequireRole } from "@/hooks/useAuth";
 import { useDataStore } from "@/store/dataStore";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -198,6 +200,142 @@ function Legend() {
   );
 }
 
+// ─── UserPicker ──────────────────────────────────────────────────────────────
+function UserPicker({
+  value, onChange, selfId, employees, isManager,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  selfId: string;
+  employees: { id: string; name: string }[];
+  isManager: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return q ? employees.filter((u) => u.name.toLowerCase().includes(q)) : employees;
+  }, [employees, search]);
+
+  const selectedLabel =
+    value === ALL_USERS
+      ? (isManager ? "All (my department)" : "All employees")
+      : value === selfId
+      ? "My calendar"
+      : employees.find((u) => u.id === value)?.name ?? "Select…";
+
+  const close = () => { setOpen(false); setSearch(""); };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSearch(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "inline-flex h-9 w-44 items-center justify-between gap-2 rounded-lg border border-surface-border",
+            "bg-white px-3 py-2 text-sm font-medium text-ink shadow-sm transition-colors",
+            "hover:border-primary/60 sm:w-52",
+            open && "border-primary ring-2 ring-primary/20",
+          )}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {value === ALL_USERS && <Users className="h-3.5 w-3.5 flex-shrink-0 text-ink-muted" />}
+            <span className="truncate">{selectedLabel}</span>
+          </span>
+          <ChevronDown className={cn("h-4 w-4 flex-shrink-0 text-ink-muted transition-transform", open && "rotate-180")} />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent className="w-56 p-2" align="end">
+        {/* Search */}
+        <div className="relative mb-2">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employees…"
+            autoFocus
+            className={cn(
+              "w-full rounded-md border border-surface-border bg-surface-subtle",
+              "py-1.5 pl-8 pr-3 text-xs text-ink placeholder:text-ink-soft outline-none",
+              "focus:border-primary focus:ring-1 focus:ring-primary/20",
+            )}
+          />
+        </div>
+
+        <div className="max-h-56 overflow-y-auto space-y-px">
+          {/* All employees / All department */}
+          {!search && (
+            <PickerOption
+              active={value === ALL_USERS}
+              onClick={() => { onChange(ALL_USERS); close(); }}
+              icon={<Users className="h-3.5 w-3.5" />}
+              label={isManager ? "All (my department)" : "All employees"}
+            />
+          )}
+
+          {/* My calendar */}
+          {(!search || "my calendar".includes(search.toLowerCase())) && (
+            <PickerOption
+              active={value === selfId}
+              onClick={() => { onChange(selfId); close(); }}
+              icon={
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary">
+                  Me
+                </span>
+              }
+              label="My calendar"
+            />
+          )}
+
+          {search && filtered.length === 0 && (
+            <p className="py-6 text-center text-xs text-ink-muted">No employees found</p>
+          )}
+
+          {filtered.map((u) => (
+            <PickerOption
+              key={u.id}
+              active={value === u.id}
+              onClick={() => { onChange(u.id); close(); }}
+              icon={
+                <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border border-surface-border bg-surface-subtle text-[9px] font-semibold text-ink-muted">
+                  {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                </span>
+              }
+              label={u.name}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function PickerOption({
+  active, onClick, icon, label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
+        active
+          ? "bg-primary/10 font-medium text-primary"
+          : "text-ink hover:bg-surface-subtle",
+      )}
+    >
+      <span className="flex-shrink-0 text-current">{icon}</span>
+      <span className="truncate">{label}</span>
+      {active && <span className="ml-auto h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />}
+    </button>
+  );
+}
+
 // ─── SegmentedControl ─────────────────────────────────────────────────────────
 function SegmentedControl<T extends string>({
   options, value, onChange, className,
@@ -229,12 +367,16 @@ function SegmentedControl<T extends string>({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function CalendarPage() {
-  const user = useAuth();
+  // All three roles can access calendar; useRequireRole redirects unauthenticated
+  // users and re-directs to /dashboard if role is somehow invalid.
+  const { user, ready } = useRequireRole(["admin", "manager", "employee"]);
   const submissions = useDataStore((s) => s.submissions);
   const users = useDataStore((s) => s.users);
   const departments = useDataStore((s) => s.departments);
 
-  const canSelect = user?.role === "admin" || user?.role === "manager";
+  const isAdmin   = user?.role === "admin";
+  const isManager = user?.role === "manager";
+  const canSelect = isAdmin || isManager;
 
   // Default admin/manager to "all employees" view; employees see only themselves.
   const [viewUserId, setViewUserId] = useState<string>(canSelect ? ALL_USERS : (user?.id ?? ""));
@@ -267,22 +409,33 @@ export default function CalendarPage() {
   const listGoToday = () => setListCursor(new Date());
 
   // ── employee pools ────────────────────────────────────────────────────────
+  // All active employees regardless of dept — used for admin "all" mode.
   const allActiveEmployees = useMemo(
     () => users.filter((u) => u.isActive && u.role === "employee"),
     [users]
   );
 
+  // Dept-scoped employees for manager; same as allActiveEmployees for admin.
   const scopedEmployees = useMemo(() => {
-    if (user?.role === "manager") {
-      return allActiveEmployees.filter((u) => u.departmentId === user.departmentId);
+    if (isManager) {
+      return allActiveEmployees.filter((u) => u.departmentId === user?.departmentId);
     }
     return allActiveEmployees;
-  }, [user?.role, user?.departmentId, allActiveEmployees]);
+  }, [isManager, user?.departmentId, allActiveEmployees]);
 
+  // IDs for the "all mode" filter — scoped to dept for manager, all for admin.
   const allEmployeeIds = useMemo(
     () => new Set(allActiveEmployees.map((u) => u.id)),
     [allActiveEmployees]
   );
+  const scopedEmployeeIds = useMemo(
+    () => new Set(scopedEmployees.map((u) => u.id)),
+    [scopedEmployees]
+  );
+  // The set used for "all employees" mode data queries.
+  const effectiveEmployeeIds = isManager ? scopedEmployeeIds : allEmployeeIds;
+  // The denominator shown in the count badge (X / N).
+  const effectiveEmployeeCount = isManager ? scopedEmployees.length : allActiveEmployees.length;
 
   // ── resolved identity ─────────────────────────────────────────────────────
   const isAllMode = canSelect && viewUserId === ALL_USERS;
@@ -290,24 +443,22 @@ export default function CalendarPage() {
   const effectiveUser = isAllMode ? null : (users.find((u) => u.id === effectiveId) ?? user);
   const isSelf = effectiveId === user?.id;
 
-  // Users shown in the picker (scoped by manager's dept)
+  // Employees shown in the UserPicker (scoped by manager's dept, excluding self).
   const pickableUsers = useMemo(() => {
     if (!canSelect) return [];
-    return users
-      .filter((u) => u.isActive)
-      .filter((u) => user?.role !== "manager" || u.departmentId === user.departmentId)
-      .filter((u) => u.id !== user?.id) // exclude self — "My calendar" is the self option
+    return scopedEmployees
+      .filter((u) => u.id !== user?.id)
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [users, user, canSelect]);
+  }, [scopedEmployees, user?.id, canSelect]);
 
-  // ── per-day submitted count (all employees) ───────────────────────────────
+  // ── per-day submitted count (scope-aware) ────────────────────────────────
   const dayCountMap = useMemo(() => {
     const m = new Map<string, number>();
     submissions
-      .filter((s) => allEmployeeIds.has(s.userId) && SUBMITTED_STATUSES.has(s.status))
+      .filter((s) => effectiveEmployeeIds.has(s.userId) && SUBMITTED_STATUSES.has(s.status))
       .forEach((s) => m.set(s.date, (m.get(s.date) ?? 0) + 1));
     return m;
-  }, [submissions, allEmployeeIds]);
+  }, [submissions, effectiveEmployeeIds]);
 
   // ── day map for month/week grid (individual mode only) ───────────────────
   const dayMap = useMemo(() => {
@@ -350,13 +501,13 @@ export default function CalendarPage() {
       intervalEnd   = endOfMonth(listCursor);
     }
     return [...submissions]
-      .filter((s) => isAllMode ? allEmployeeIds.has(s.userId) : s.userId === effectiveId)
+      .filter((s) => isAllMode ? effectiveEmployeeIds.has(s.userId) : s.userId === effectiveId)
       .filter((s) => statusFilter === "all" || s.status === statusFilter)
       .filter((s) => isWithinInterval(parseISO(s.date), { start: intervalStart, end: intervalEnd }))
       .sort((a, b) => b.date.localeCompare(a.date) || a.userId.localeCompare(b.userId));
-  }, [submissions, isAllMode, allEmployeeIds, effectiveId, listPeriod, listCursor, statusFilter]);
+  }, [submissions, isAllMode, effectiveEmployeeIds, effectiveId, listPeriod, listCursor, statusFilter]);
 
-  if (!user) return null;
+  if (!ready) return null;
 
   // ── period label ──────────────────────────────────────────────────────────
   const periodLabel = view === "week"
@@ -415,7 +566,9 @@ export default function CalendarPage() {
           <h1 className="text-xl font-semibold text-ink sm:text-2xl">Calendar</h1>
           <p className="mt-0.5 text-sm text-ink-muted">
             {isAllMode
-              ? "Team submission overview."
+              ? isManager
+                ? "Your department's submission overview."
+                : "Team submission overview."
               : isSelf
               ? "Track your submission history by day, week, or month."
               : `Viewing ${effectiveUser?.name ?? ""}'s calendar.`}
@@ -426,23 +579,13 @@ export default function CalendarPage() {
         <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           {/* User picker — admins & managers only */}
           {canSelect && (
-            <Select value={viewUserId} onValueChange={setViewUserId}>
-              <SelectTrigger className="h-9 w-44 sm:w-52 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_USERS}>
-                  <span className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5 text-ink-muted" />
-                    All employees
-                  </span>
-                </SelectItem>
-                <SelectItem value={user.id}>My calendar</SelectItem>
-                {pickableUsers.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UserPicker
+              value={viewUserId}
+              onChange={setViewUserId}
+              selfId={user!.id}
+              employees={pickableUsers}
+              isManager={isManager}
+            />
           )}
 
           {/* View switcher */}
@@ -568,7 +711,7 @@ export default function CalendarPage() {
                     compact
                     onSelect={handleSelect}
                     submittedCount={isSameMonth(d, cursor) ? (dayCountMap.get(iso) ?? 0) : undefined}
-                    totalCount={isSameMonth(d, cursor) ? allActiveEmployees.length : undefined}
+                    totalCount={isSameMonth(d, cursor) ? effectiveEmployeeCount : undefined}
                   />
                 );
               })}
@@ -612,7 +755,7 @@ export default function CalendarPage() {
                         compact={false}
                         onSelect={handleSelect}
                         submittedCount={dayCountMap.get(iso) ?? 0}
-                        totalCount={allActiveEmployees.length}
+                        totalCount={effectiveEmployeeCount}
                       />
                     </div>
                   );
@@ -800,9 +943,9 @@ export default function CalendarPage() {
         onOpenChange={setDayModalOpen}
         date={dayModalDate}
         scopedEmployees={scopedEmployees}
-        allEmployeeIds={allEmployeeIds}
+        allEmployeeIds={effectiveEmployeeIds}
         submissions={submissions}
-        totalEmployees={allActiveEmployees.length}
+        totalEmployees={effectiveEmployeeCount}
         canOverride={canSelect}
         departments={departments}
       />
