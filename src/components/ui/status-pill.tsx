@@ -3,7 +3,12 @@ import { STATUS_META } from "@/lib/status";
 import type { SubmissionStatus } from "@/lib/constants";
 
 export function StatusPill({ status, className }: { status: SubmissionStatus; className?: string }) {
-  const m = STATUS_META[status];
+  const m = STATUS_META[status] ?? {
+    label: status ?? "Unknown",
+    bg: "bg-slate-100",
+    fg: "text-slate-600",
+    dot: "bg-slate-400",
+  };
   return (
     <span
       className={cn(
