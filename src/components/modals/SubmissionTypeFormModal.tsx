@@ -52,6 +52,7 @@ const schema = z.object({
   requiredDaily: z.boolean(),
   deadlineTime: z.string().min(1, "Deadline time is required"),
   maxFileSizeMB: z.number().min(1).max(100),
+  maxFiles: z.number().min(1).max(20),
   isActive: z.boolean(),
 });
 type V = z.infer<typeof schema>;
@@ -84,6 +85,7 @@ export function SubmissionTypeFormModal({
       requiredDaily: true,
       deadlineTime: "18:00",
       maxFileSizeMB: 10,
+      maxFiles: 5,
       isActive: true,
     },
   });
@@ -96,6 +98,7 @@ export function SubmissionTypeFormModal({
         requiredDaily: editing.requiredDaily,
         deadlineTime: editing.deadlineTime,
         maxFileSizeMB: editing.maxFileSizeMB,
+        maxFiles: editing.maxFiles,
         isActive: editing.isActive,
       });
       setSelectedTypes(editing.allowedFileTypes);
@@ -106,6 +109,7 @@ export function SubmissionTypeFormModal({
         requiredDaily: true,
         deadlineTime: "18:00",
         maxFileSizeMB: 10,
+        maxFiles: 5,
         isActive: true,
       });
       setSelectedTypes(DEFAULT_FILE_TYPES);
@@ -143,6 +147,7 @@ export function SubmissionTypeFormModal({
       deadlineTime: v.deadlineTime,
       allowedFileTypes: selectedTypes,
       maxFileSizeMB: v.maxFileSizeMB,
+      maxFiles: v.maxFiles,
       isActive: v.isActive,
     };
 
@@ -202,7 +207,7 @@ export function SubmissionTypeFormModal({
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             {/* Deadline Time */}
             <div className="space-y-1.5">
               <Label>Deadline time</Label>
@@ -223,6 +228,20 @@ export function SubmissionTypeFormModal({
               />
               {errors.maxFileSizeMB && (
                 <p className="text-xs text-danger">{errors.maxFileSizeMB.message}</p>
+              )}
+            </div>
+
+            {/* Max files per submission */}
+            <div className="space-y-1.5">
+              <Label>Max files</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                {...register("maxFiles", { valueAsNumber: true })}
+              />
+              {errors.maxFiles && (
+                <p className="text-xs text-danger">{errors.maxFiles.message}</p>
               )}
             </div>
           </div>

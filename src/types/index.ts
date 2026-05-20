@@ -31,6 +31,7 @@ export interface SubmissionType {
   deadlineTime: string; // "18:00"
   allowedFileTypes: string[];
   maxFileSizeMB: number;
+  maxFiles: number;
   isActive: boolean;
 }
 

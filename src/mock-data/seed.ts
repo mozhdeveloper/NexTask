@@ -120,6 +120,7 @@ export const seedSubmissionTypes: SubmissionType[] = [
     deadlineTime: "18:00",
     allowedFileTypes: ["pdf", "docx", "xlsx", "csv", "png", "jpg"],
     maxFileSizeMB: 10,
+    maxFiles: 5,
     isActive: true,
   },
   {
@@ -130,6 +131,7 @@ export const seedSubmissionTypes: SubmissionType[] = [
     deadlineTime: "17:00",
     allowedFileTypes: ["xlsx", "xls", "csv"],
     maxFileSizeMB: 8,
+    maxFiles: 3,
     isActive: true,
   },
   {
@@ -140,6 +142,7 @@ export const seedSubmissionTypes: SubmissionType[] = [
     deadlineTime: "19:00",
     allowedFileTypes: ["pdf", "png", "jpg"],
     maxFileSizeMB: 10,
+    maxFiles: 5,
     isActive: true,
   },
   {
@@ -150,6 +153,7 @@ export const seedSubmissionTypes: SubmissionType[] = [
     deadlineTime: "18:30",
     allowedFileTypes: ["xlsx", "pdf", "csv"],
     maxFileSizeMB: 10,
+    maxFiles: 5,
     isActive: true,
   },
   {
@@ -160,6 +164,7 @@ export const seedSubmissionTypes: SubmissionType[] = [
     deadlineTime: "17:00",
     allowedFileTypes: ["pdf", "docx"],
     maxFileSizeMB: 6,
+    maxFiles: 3,
     isActive: true,
   },
 ];

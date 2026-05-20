@@ -92,6 +92,8 @@ export const submissionService = {
     const type = submissionTypes.find((t) => t.id === input.submissionTypeId);
     if (!type) throw new Error("Submission type not found");
 
+    if (input.files.length > type.maxFiles)
+      throw new Error(`Too many files. Max ${type.maxFiles} file${type.maxFiles === 1 ? "" : "s"} per submission.`);
     for (const f of input.files) {
       const ext = (f.name.split(".").pop() || "").toLowerCase();
       if (!type.allowedFileTypes.includes(ext))

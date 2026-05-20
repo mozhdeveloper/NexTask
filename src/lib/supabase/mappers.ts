@@ -60,6 +60,7 @@ export const mapSubmissionType = (r: DbSubmissionTypeRow): SubmissionType => ({
   deadlineTime: r.deadline_time?.slice(0, 5) ?? "18:00",
   allowedFileTypes: r.allowed_file_types ?? [],
   maxFileSizeMB: r.max_file_size_mb,
+  maxFiles: r.max_files ?? 5,
   isActive: r.is_active,
 });
 

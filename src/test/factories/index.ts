@@ -50,6 +50,7 @@ export const createSubmissionType = (overrides: Partial<SubmissionType> = {}): S
   deadlineTime: "18:00",
   allowedFileTypes: ["pdf", "docx", "png"],
   maxFileSizeMB: 10,
+  maxFiles: 5,
   isActive: true,
   ...overrides,
 });

@@ -117,6 +117,7 @@ describe("mapSubmissionType", () => {
     deadline_time: "18:00:00",
     allowed_file_types: ["pdf", "docx"],
     max_file_size_mb: 10,
+    max_files: 5,
     is_active: true,
     created_at: "2026-01-01T00:00:00Z",
   };

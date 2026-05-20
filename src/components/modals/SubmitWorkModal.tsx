@@ -114,6 +114,11 @@ export function SubmitWorkModal({
     if (!selectedType) return;
     const allowed = selectedType.allowedFileTypes;
     const maxBytes = selectedType.maxFileSizeMB * 1024 * 1024;
+    const slotsLeft = selectedType.maxFiles - files.length;
+    if (slotsLeft <= 0) {
+      toast.error(`Max ${selectedType.maxFiles} file${selectedType.maxFiles === 1 ? "" : "s"} allowed per submission.`);
+      return;
+    }
     const rejected: string[] = [];
     const accepted: File[] = [];
     for (const f of incoming) {
@@ -126,10 +131,13 @@ export function SubmitWorkModal({
         accepted.push(f);
       }
     }
-    if (rejected.length > 0) {
+    const capped = accepted.slice(0, slotsLeft);
+    if (accepted.length > slotsLeft) {
+      toast.error(`Only ${slotsLeft} more file${slotsLeft === 1 ? "" : "s"} can be added (max ${selectedType.maxFiles}).`);
+    } else if (rejected.length > 0) {
       toast.error(`${rejected.length} file(s) rejected: ${rejected[0]}${rejected.length > 1 ? ` (+${rejected.length - 1} more)` : ""}`);
     }
-    if (accepted.length > 0) setFiles((prev) => [...prev, ...accepted]);
+    if (capped.length > 0) setFiles((prev) => [...prev, ...capped]);
   };
 
   const onSubmit = async (v: FormValues) => {
@@ -313,7 +321,7 @@ export function SubmitWorkModal({
                   </Label>
                   {selectedType && (
                     <span className="text-[11px] text-ink-muted">
-                      {selectedType.allowedFileTypes.map((e) => e.toUpperCase()).join(", ")} · max {selectedType.maxFileSizeMB} MB · deadline {selectedType.deadlineTime}
+                      {selectedType.allowedFileTypes.map((e) => e.toUpperCase()).join(", ")} · max {selectedType.maxFileSizeMB} MB · up to {selectedType.maxFiles} file{selectedType.maxFiles === 1 ? "" : "s"} · deadline {selectedType.deadlineTime}
                     </span>
                   )}
                 </div>
@@ -366,7 +374,7 @@ export function SubmitWorkModal({
                     </div>
                     <p className="text-xs text-ink-soft">
                       {selectedType
-                        ? `Accepted: ${selectedType.allowedFileTypes.map((e) => e.toUpperCase()).join(", ")} · up to ${selectedType.maxFileSizeMB} MB each`
+                        ? `Accepted: ${selectedType.allowedFileTypes.map((e) => e.toUpperCase()).join(", ")} · up to ${selectedType.maxFileSizeMB} MB each · max ${selectedType.maxFiles} file${selectedType.maxFiles === 1 ? "" : "s"}`
                         : "Any file type"}
                     </p>
                   </div>

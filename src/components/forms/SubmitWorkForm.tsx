@@ -94,6 +94,11 @@ export function SubmitWorkForm({
     if (!selectedType) return;
     const allowed = selectedType.allowedFileTypes;
     const maxBytes = selectedType.maxFileSizeMB * 1024 * 1024;
+    const slotsLeft = selectedType.maxFiles - files.length;
+    if (slotsLeft <= 0) {
+      toast.error(`Max ${selectedType.maxFiles} file${selectedType.maxFiles === 1 ? "" : "s"} allowed per submission.`);
+      return;
+    }
     const rejected: string[] = [];
     const accepted: File[] = [];
 
@@ -108,7 +113,10 @@ export function SubmitWorkForm({
       }
     }
 
-    if (rejected.length > 0) {
+    const capped = accepted.slice(0, slotsLeft);
+    if (accepted.length > slotsLeft) {
+      toast.error(`Only ${slotsLeft} more file${slotsLeft === 1 ? "" : "s"} can be added (max ${selectedType.maxFiles}).`);
+    } else if (rejected.length > 0) {
       toast.error(
         <div>
           <p className="font-medium">Some files were rejected:</p>
@@ -120,8 +128,8 @@ export function SubmitWorkForm({
         </div>
       );
     }
-    if (accepted.length > 0) {
-      setFiles((prev) => [...prev, ...accepted]);
+    if (capped.length > 0) {
+      setFiles((prev) => [...prev, ...capped]);
     }
   };
 
@@ -280,7 +288,7 @@ export function SubmitWorkForm({
                   {selectedType.allowedFileTypes.join(", ").toUpperCase()}
                 </span>
                 <br />
-                Max {selectedType.maxFileSizeMB} MB · Deadline {selectedType.deadlineTime}
+                Max {selectedType.maxFileSizeMB} MB · up to {selectedType.maxFiles} file{selectedType.maxFiles === 1 ? "" : "s"} · Deadline {selectedType.deadlineTime}
               </div>
             )}
           </div>

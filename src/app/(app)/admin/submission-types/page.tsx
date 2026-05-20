@@ -127,7 +127,7 @@ export default function SubmissionTypesPage() {
                         )}
                       </div>
                     </TD>
-                    <TD className="text-sm">{t.maxFileSizeMB} MB</TD>
+                    <TD className="text-sm">{t.maxFileSizeMB} MB · {t.maxFiles} file{t.maxFiles === 1 ? "" : "s"}</TD>
                     <TD>
                       {t.isActive ? (
                         <Badge variant="success">Active</Badge>

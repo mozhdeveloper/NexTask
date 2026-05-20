@@ -38,6 +38,7 @@ export const submissionTypeService = {
       deadline_time: t.deadlineTime,
       allowed_file_types: t.allowedFileTypes,
       max_file_size_mb: t.maxFileSizeMB,
+      max_files: t.maxFiles,
       is_active: t.isActive,
     });
     if (error) warn("create", error);
@@ -64,6 +65,7 @@ export const submissionTypeService = {
     if (patch.deadlineTime !== undefined) dbPatch.deadline_time = patch.deadlineTime;
     if (patch.allowedFileTypes !== undefined) dbPatch.allowed_file_types = patch.allowedFileTypes;
     if (patch.maxFileSizeMB !== undefined) dbPatch.max_file_size_mb = patch.maxFileSizeMB;
+    if (patch.maxFiles !== undefined) dbPatch.max_files = patch.maxFiles;
     if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
 
     if (Object.keys(dbPatch).length > 0) {

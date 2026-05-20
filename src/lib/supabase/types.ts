@@ -47,6 +47,7 @@ export interface DbSubmissionTypeRow {
   deadline_time: string;
   allowed_file_types: string[];
   max_file_size_mb: number;
+  max_files: number | null;
   is_active: boolean;
   created_at: string;
 }
