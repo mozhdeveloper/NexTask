@@ -229,9 +229,11 @@ export const submissionService = {
             r.id === approvedRev.id ? { ...r, status: "resubmitted", resubmittedAt } : r
           )
         );
+        // Only update status — do NOT overwrite decided_at (that's the admin's
+        // original approval timestamp and must stay intact for the audit trail).
         const { error: revErr } = await supabase
           .from("revisions")
-          .update({ status: "resubmitted", decided_at: resubmittedAt })
+          .update({ status: "resubmitted" })
           .eq("id", approvedRev.id);
         if (revErr) warn("revision.resubmit", revErr);
 
@@ -246,7 +248,9 @@ export const submissionService = {
 
     // Notify admins and managers; use "warning" for late submissions.
     const isLate = status === "late";
-    const isRevision = (existing?.versionNumber ?? 0) >= 1;
+    // True only when there was a previously *submitted* entry — not just a
+    // started-but-not-yet-submitted startDay() record (versionNumber = 1 but submittedAt = null).
+    const isRevision = !!existing?.submittedAt;
     users
       .filter((u) => u.role === "admin" || u.role === "manager")
       .forEach((recipient) => {

@@ -264,7 +264,7 @@ export default function RevisionsPage() {
                             cfg.bg, cfg.border
                           )}>
                             <span className={cn("font-semibold", cfg.text)}>
-                              {r.status === "approved" ? "Approval note: " : "Rejection reason: "}
+                              {r.status === "rejected" ? "Rejection reason: " : "Approval note: "}
                             </span>
                             <span className="text-ink-muted">{r.adminNote}</span>
                           </div>
@@ -275,8 +275,11 @@ export default function RevisionsPage() {
                           <span>Requested {fmtDate(r.createdAt, "MMM dd, yyyy")}</span>
                           {r.decidedAt && (
                             <span>
-                              {r.status === "approved" ? "Approved" : "Rejected"} {fmtDate(r.decidedAt, "MMM dd, yyyy")}
+                              {r.status === "rejected" ? "Rejected" : "Approved"} {fmtDate(r.decidedAt, "MMM dd, yyyy")}
                             </span>
+                          )}
+                          {r.status === "resubmitted" && r.resubmittedAt && (
+                            <span>Resubmitted {fmtDate(r.resubmittedAt, "MMM dd, yyyy")}</span>
                           )}
                         </div>
                       </div>
