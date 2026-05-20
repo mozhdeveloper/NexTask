@@ -95,7 +95,8 @@ async function handle(req: Request) {
 
   await supabaseAdmin
     .from("work_settings")
-    .upsert({ id: true, last_auto_backup_date: todayISO });
+    .update({ last_auto_backup_date: todayISO })
+    .eq("id", true);
 
   // ── Email ─────────────────────────────────────────────────────────────────
   const email = ws.auto_backup_email as string | null;
