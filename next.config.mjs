@@ -1,5 +1,6 @@
 import os from "os";
 import path from "path";
+import { fileURLToPath } from "url";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -16,7 +17,12 @@ const nextConfig = {
       config.cache = {
         type: "filesystem",
         cacheDirectory: path.join(os.tmpdir(), "nextask-webpack-cache"),
-        buildDependencies: { config: [import.meta.url] },
+        buildDependencies: {
+          // fileURLToPath converts the ESM file:/// URI to a plain path
+          // that webpack's resolver can handle — avoids the "Can't resolve
+          // file:///" warning that appears when import.meta.url is used raw.
+          config: [fileURLToPath(import.meta.url)],
+        },
       };
     }
     return config;
