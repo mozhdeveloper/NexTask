@@ -1,6 +1,6 @@
 ﻿"use client";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -19,6 +19,7 @@ import {
   Clock,
   MessageSquarePlus,
   CheckCircle2,
+  X,
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -119,7 +120,7 @@ export function ProjectDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent hideClose className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         {/* Status colour stripe */}
         <div className={cn("h-1 w-full flex-shrink-0 rounded-t-lg", sc.stripe)} />
 
@@ -132,12 +133,19 @@ export function ProjectDetailsModal({
                 <p className="text-sm text-muted-foreground leading-relaxed">{project.description}</p>
               )}
             </DialogHeader>
-            {onEdit && (
-              <Button size="sm" variant="outline" onClick={onEdit} className="flex-shrink-0 gap-1.5">
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </Button>
-            )}
+            <div className="flex flex-shrink-0 items-center gap-2">
+              {onEdit && (
+                <Button size="sm" variant="outline" onClick={onEdit} className="gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              )}
+              <DialogClose asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground" aria-label="Close">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
           </div>
 
           {/* Status + department + revision badge */}
