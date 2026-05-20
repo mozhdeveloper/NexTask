@@ -8,7 +8,7 @@ import {
   UploadCloud, X, FileText, AlertCircle, Clock3, CheckCircle2, Paperclip,
 } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/input";
@@ -161,7 +161,7 @@ export function SubmitWorkModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent hideClose className="flex max-h-[90vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         {/* ── Header ── */}
         <DialogHeader className="shrink-0 border-b border-surface-border bg-surface-subtle px-6 py-4">
           <div className="flex items-start justify-between gap-4">
@@ -201,6 +201,11 @@ export function SubmitWorkModal({
                 {existing.taskTitle}
               </span>
             )}
+            <DialogClose asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 rounded-md text-muted-foreground hover:text-foreground" aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
           </div>
         </DialogHeader>
 

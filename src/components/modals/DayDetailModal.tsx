@@ -2,10 +2,11 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import {
-  Users, Search, CheckCircle2, Clock3, AlertCircle, ChevronDown,
+  Users, Search, CheckCircle2, Clock3, AlertCircle, ChevronDown, X,
 } from "lucide-react";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -220,11 +221,18 @@ export function DayDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogContent hideClose className="max-w-lg max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
 
           {/* Header */}
           <DialogHeader className="flex-shrink-0 px-5 pt-5 pb-3 border-b border-surface-border">
-            <DialogTitle>{format(date, "EEEE, MMMM d, yyyy")}</DialogTitle>
+            <div className="flex items-start justify-between gap-2">
+              <DialogTitle>{format(date, "EEEE, MMMM d, yyyy")}</DialogTitle>
+              <DialogClose asChild>
+                <Button size="icon" variant="ghost" className="-mr-1 -mt-1 h-8 w-8 flex-shrink-0 rounded-md text-muted-foreground hover:text-foreground" aria-label="Close">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
             <DialogDescription asChild>
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between text-xs text-ink-muted">

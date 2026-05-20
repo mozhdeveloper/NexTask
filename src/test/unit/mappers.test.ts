@@ -355,6 +355,7 @@ describe("mapWorkSettings", () => {
     updated_at: "2026-05-18T00:00:00Z",
     work_start_time: "09:00",
     work_end_time: "18:00",
+    permissions: null,
   };
 
   it("should map working_days to workingDays array", () => {

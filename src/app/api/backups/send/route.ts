@@ -26,7 +26,7 @@ const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20 MB
 // This matches the Resend account owner (the only recipient Resend will accept
 // while the custom sending domain is unverified) and gives admins a single,
 // auditable destination for ad-hoc backup emails.
-export const MANUAL_BACKUP_RECIPIENT = "premium.global.official@gmail.com";
+const MANUAL_BACKUP_RECIPIENT = "premium.global.official@gmail.com";
 
 // Resend always allows this FROM without a verified domain. Using it for
 // manual sends guarantees deliverability regardless of RESEND_FROM env state.

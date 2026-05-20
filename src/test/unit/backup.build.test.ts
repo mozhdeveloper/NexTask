@@ -39,7 +39,7 @@ vi.mock("@/lib/supabase/admin", () => ({
             const ab = v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength);
             return { data: { arrayBuffer: async () => ab }, error: null };
           }
-          return { data: null, error: { message: v.error } };
+          return { data: null, error: { message: (v as { error: string }).error } };
         }),
         upload: vi.fn(async (path: string, body: Buffer, opts: { contentType?: string }) => {
           state.uploadCalls.push({ bucket, path, body, contentType: opts?.contentType });
