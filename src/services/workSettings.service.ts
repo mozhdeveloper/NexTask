@@ -7,6 +7,8 @@ import type { WorkSettings } from "@/types";
 import { supabase } from "@/lib/supabase/client";
 import { mapWorkSettings, mapAutoBackupSettings } from "@/lib/supabase/mappers";
 import type { DbWorkSettingsRow, DbHolidayRow } from "@/lib/supabase/types";
+import type { Role } from "@/lib/constants";
+import { DEFAULT_PERMISSIONS } from "@/lib/permissions";
 import { logService } from "./log.service";
 
 function warn(label: string, e: unknown) {
@@ -175,5 +177,25 @@ export const workSettingsService = {
     const holRows = (hol.data ?? []) as DbHolidayRow[];
     useDataStore.getState().setWorkSettings(mapWorkSettings(wsRow, holRows));
     useDataStore.getState().setAutoBackupSettings(mapAutoBackupSettings(wsRow));
+
+    // Load persisted permissions from DB, falling back to defaults if empty.
+    const dbPerms = wsRow?.permissions;
+    if (dbPerms && Object.keys(dbPerms).length > 0) {
+      useDataStore.getState().setPermissions({
+        admin:    dbPerms["admin"]    ?? DEFAULT_PERMISSIONS.admin,
+        manager:  dbPerms["manager"]  ?? DEFAULT_PERMISSIONS.manager,
+        employee: dbPerms["employee"] ?? DEFAULT_PERMISSIONS.employee,
+      });
+    }
+  },
+
+  /** Persist permission overrides to Supabase so all browsers see the same state. */
+  async savePermissions(permissions: Record<Role, string[]>) {
+    const { error } = await supabase
+      .from("work_settings")
+      .update({ permissions })
+      .eq("id", true);
+    if (error) warn("savePermissions", error);
+    return error;
   },
 };

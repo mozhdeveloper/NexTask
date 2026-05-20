@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
 import { useDataStore } from "@/store/dataStore";
@@ -11,6 +11,7 @@ import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS } from "@/lib/permissions";
 import type { Role } from "@/lib/constants";
 import { toast } from "sonner";
 import { logService } from "@/services/log.service";
+import { workSettingsService } from "@/services/workSettings.service";
 import { cn } from "@/lib/utils";
 
 type PermMap = Record<Role, string[]>;
@@ -20,8 +21,22 @@ export default function UsersRolesPage() {
   const me = useAuth();
   const users = useDataStore((s) => s.users);
   const stored = useDataStore((s) => s.permissions);
+  const dataHydrated = useDataStore((s) => s.hydrated);
   const setPermissions = useDataStore((s) => s.setPermissions);
-  const [draft, setDraft] = useState<PermMap>(stored);
+  const [saving, setSaving] = useState(false);
+
+  // Initialize draft to DEFAULT_PERMISSIONS; re-sync once after the data store
+  // is fully hydrated from Supabase (avoids capturing stale localStorage value
+  // that hasn't been overwritten by the DB load yet).
+  const [draft, setDraft] = useState<PermMap>(DEFAULT_PERMISSIONS);
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (dataHydrated && !syncedRef.current) {
+      syncedRef.current = true;
+      setDraft(stored);
+    }
+  }, [dataHydrated, stored]);
+
   const dirty = useMemo(
     () =>
       (["admin", "manager", "employee"] as Role[]).some(
@@ -59,14 +74,25 @@ export default function UsersRolesPage() {
     });
   };
 
-  const save = () => {
-    setPermissions(draft);
-    void logService.append({
-      userId: me?.id ?? "",
-      action: "settings.permissions_update",
-      targetType: "permissions",
-    });
-    toast.success("Permissions saved.");
+  const save = async () => {
+    setSaving(true);
+    try {
+      const err = await workSettingsService.savePermissions(draft);
+      if (err) {
+        toast.error("Failed to save permissions. Please try again.");
+        return;
+      }
+      // Update local store/localStorage cache after successful DB write.
+      setPermissions(draft);
+      void logService.append({
+        userId: me?.id ?? "",
+        action: "settings.permissions_update",
+        targetType: "permissions",
+      });
+      toast.success("Permissions saved.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const resetDefaults = () => {
@@ -74,7 +100,7 @@ export default function UsersRolesPage() {
     toast.info("Reverted to defaults — click Save to apply.");
   };
 
-  if (!ready) return null;
+  if (!ready || !dataHydrated) return null;
 
   return (
     <div className="space-y-6">
@@ -83,11 +109,11 @@ export default function UsersRolesPage() {
         description="Toggle permissions per role. Changes take effect immediately after saving."
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={resetDefaults}>
+            <Button variant="outline" size="sm" onClick={resetDefaults} disabled={saving}>
               <RotateCcw className="h-4 w-4" /> Defaults
             </Button>
-            <Button size="sm" onClick={save} disabled={!dirty}>
-              <Save className="h-4 w-4" /> Save changes
+            <Button size="sm" onClick={save} disabled={!dirty || saving}>
+              <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save changes"}
             </Button>
           </div>
         }

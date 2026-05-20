@@ -159,6 +159,8 @@ export interface DbWorkSettingsRow {
   updated_at: string;
   work_start_time: string;
   work_end_time: string;
+  /** JSONB column storing per-role permission arrays. {} means use defaults. */
+  permissions: Record<string, string[]> | null;
 }
 
 export interface DbHolidayRow {
