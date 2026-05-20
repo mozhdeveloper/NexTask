@@ -120,12 +120,12 @@ export default function BackupsPage() {
             </button>
           </div>
 
-          {/* Time + Email */}
-          <div className={cn(
-            "grid gap-4 sm:grid-cols-2 transition-opacity duration-200",
-            !abEnabled && "pointer-events-none opacity-40",
-          )}>
-            <div className="space-y-1.5">
+          {/* Time + Email — email is always editable (used by auto backup AND manual email button) */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className={cn(
+              "space-y-1.5 transition-opacity duration-200",
+              !abEnabled && "pointer-events-none opacity-40",
+            )}>
               <Label
                 htmlFor="ab-time"
                 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-muted"
@@ -160,29 +160,44 @@ export default function BackupsPage() {
                 value={abEmail}
                 onChange={(e) => { setAbEmail(e.target.value); setDirty(true); }}
               />
-              <p className="text-[11px] text-ink-soft">Receive a daily backup notification at this address</p>
+              <p className="text-[11px] text-ink-soft">
+                Used for auto backup notifications and the &ldquo;Email backup&rdquo; button above.
+              </p>
             </div>
           </div>
 
           {/* Status + Save */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-border pt-4">
-            <div className="flex items-center gap-2">
-              {abs.enabled ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" />
-                  <span className="text-xs text-ink-muted">
-                    {abs.lastAutoBackupDate
-                      ? `Last run: ${fmtDate(abs.lastAutoBackupDate)}`
-                      : "Enabled — awaiting first run"}
-                    <span className="mx-1.5 text-surface-border">·</span>
-                    <span className="font-medium text-ink">Next: {nextScheduledLabel(abs.time)}</span>
-                  </span>
-                </>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                {abs.enabled ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-success" />
+                    <span className="text-xs text-ink-muted">
+                      {abs.lastAutoBackupDate
+                        ? `Last run: ${fmtDate(abs.lastAutoBackupDate)}`
+                        : "Enabled — awaiting first run"}
+                      <span className="mx-1.5 text-surface-border">·</span>
+                      <span className="font-medium text-ink">Next: {nextScheduledLabel(abs.time)}</span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
+                    <span className="text-xs text-ink-muted">Auto backup is disabled</span>
+                  </>
+                )}
+              </div>
+              {abs.email ? (
+                <div className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  <Mail className="h-3 w-3 flex-shrink-0" />
+                  <span>Delivery address: <span className="font-semibold text-ink">{abs.email}</span></span>
+                </div>
               ) : (
-                <>
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 text-ink-soft" />
-                  <span className="text-xs text-ink-muted">Auto backup is disabled</span>
-                </>
+                <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
+                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                  <span>No delivery email set — enter one above and save.</span>
+                </div>
               )}
             </div>
             <Button size="sm" onClick={saveAutoBackup} disabled={!dirty}>

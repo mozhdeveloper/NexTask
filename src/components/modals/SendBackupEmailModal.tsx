@@ -71,7 +71,10 @@ export function SendBackupEmailModal({
             autoFocus
           />
           <p className="text-[11px] text-ink-soft">
-            Delivered by Resend. Includes a JSON attachment with every table snapshot.
+            {defaultEmail
+              ? <span>Pre-filled from your backup settings. Change it below for a one-time send.</span>
+              : <span>No default set — save a delivery email in Backup Settings to pre-fill this automatically.</span>
+            }
           </p>
         </div>
 

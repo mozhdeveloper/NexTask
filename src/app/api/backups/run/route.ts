@@ -35,7 +35,8 @@ export async function POST() {
 
   const id = `bk_${crypto.randomUUID().slice(0, 8)}`;
   const fileName = backupFileName();
-  const filePath = `D:\\OfficeSystemStorage\\backups\\${fileName}`;
+  const storagePath = process.env.BACKUP_STORAGE_PATH ?? "./storage/backups";
+  const filePath = `${storagePath}/${fileName}`;
   const startedAt = new Date().toISOString();
 
   const ins = await supabaseAdmin.from("backup_logs").insert({
