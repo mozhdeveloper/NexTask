@@ -149,6 +149,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   date: Date | null;
   scopedEmployees: User[];
+  allEmployeeIds: Set<string>;
   submissions: Submission[];
   totalEmployees: number;
   canOverride: boolean;
@@ -156,7 +157,7 @@ interface Props {
 }
 
 export function DayDetailModal({
-  open, onOpenChange, date, scopedEmployees, submissions,
+  open, onOpenChange, date, scopedEmployees, allEmployeeIds, submissions,
   totalEmployees, canOverride, departments,
 }: Props) {
   const [q, setQ] = useState("");
@@ -177,9 +178,13 @@ export function DayDetailModal({
 
   const globalSubmittedCount = useMemo(() => {
     if (!iso) return 0;
-    return submissions.filter((s) => s.date === iso && SUBMITTED_STATUSES.has(s.status)).length;
+    // Only count submissions from active employees — not admins/managers — so the
+    // numerator always matches the totalEmployees denominator.
+    return submissions.filter(
+      (s) => s.date === iso && SUBMITTED_STATUSES.has(s.status) && allEmployeeIds.has(s.userId)
+    ).length;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iso, submissions, tick]);
+  }, [iso, submissions, allEmployeeIds, tick]);
 
   const rows = useMemo(() => {
     const lower = q.toLowerCase();

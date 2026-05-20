@@ -234,6 +234,11 @@ export default function CalendarPage() {
     return m;
   }, [submissions, allActiveEmployees]);
 
+  const allEmployeeIds = useMemo(
+    () => new Set(allActiveEmployees.map((u) => u.id)),
+    [allActiveEmployees]
+  );
+
   const canSelect = user?.role === "admin" || user?.role === "manager";
   const canOverride = user?.role === "admin" || user?.role === "manager";
   // Defensive scope: if the picked user isn't in scope for a manager, fall back to self.
@@ -604,6 +609,7 @@ export default function CalendarPage() {
         onOpenChange={setDayModalOpen}
         date={dayModalDate}
         scopedEmployees={scopedEmployees}
+        allEmployeeIds={allEmployeeIds}
         submissions={submissions}
         totalEmployees={allActiveEmployees.length}
         canOverride={canOverride}
