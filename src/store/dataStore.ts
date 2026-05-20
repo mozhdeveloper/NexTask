@@ -112,6 +112,18 @@ export const useDataStore = create<DataState>()(
         autoBackupSettings: state.autoBackupSettings,
         permissions: state.permissions,
       }),
+      // Deep-merge so partial stored data never wipes required fields.
+      // e.g. an old stored { holidays: [] } won't erase workingDays from the default.
+      merge: (persisted: unknown, current: DataState): DataState => {
+        const p = (persisted ?? {}) as Partial<DataState>;
+        const def = initial();
+        return {
+          ...current,
+          workSettings: { ...def.workSettings, ...(p.workSettings ?? {}) },
+          autoBackupSettings: { ...def.autoBackupSettings, ...(p.autoBackupSettings ?? {}) },
+          permissions: p.permissions ?? current.permissions,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         if (state) state.hydrated = true;
       },

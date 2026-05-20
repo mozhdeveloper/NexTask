@@ -148,18 +148,25 @@ function rowsFor(type: ReportType, scope: ReportScope): Array<Record<string, unk
       const activeWorkers = users.filter(
         (u) => u.isActive && (u.role === "employee" || u.role === "manager"),
       );
+      // Defensive fallbacks — workSettings may be partially hydrated from localStorage
+      // (e.g. an old stored value missing workingDays). Guard here as belt-and-suspenders.
+      const workingDays = workSettings?.workingDays ?? [1, 2, 3, 4, 5];
+      const wHolidays   = workSettings?.holidays   ?? [];
       // Pre-built Set for O(1) lookup — avoids O(submissions) scan per worker-day.
       const submittedSet = new Set(submissions.map((s) => `${s.userId}|${s.date}`));
+      // Call isPastWorkEnd once outside the loop instead of once per worker per day.
+      const isPastEnd = workSettingsService.isPastWorkEnd();
       const today = todayISO();
       const cap = end < today ? end : today;
-      for (let d = start; d <= cap; d = addDays(d, 1)) {
-        // Inline working-day check — uses already-cached workSettings, no getState() per iteration.
+      // 400-day hard cap prevents infinite loops if start/end are malformed.
+      let _days = 0;
+      for (let d = start; d <= cap && _days < 400; d = addDays(d, 1), _days++) {
         const dt = new Date(d + "T12:00:00");
-        if (!workSettings.workingDays.includes(dt.getDay())) continue;
-        if (workSettings.holidays.some((h) => h.date === d)) continue;
+        if (!workingDays.includes(dt.getDay())) continue;
+        if (wHolidays.some((h) => h.date === d)) continue;
         for (const u of activeWorkers) {
           if (submittedSet.has(`${u.id}|${d}`)) continue;
-          if (d === today && !workSettingsService.isPastWorkEnd()) continue;
+          if (d === today && !isPastEnd) continue;
           virtual.push({
             Date: d,
             Employee: u.name,
@@ -244,7 +251,12 @@ export const reportService = {
   resolveRange,
 
   preview(type: ReportType, scope: ReportScope) {
-    return rowsFor(type, scope);
+    try {
+      return rowsFor(type, scope);
+    } catch (err) {
+      console.error("[reportService.preview]", err);
+      return [];
+    }
   },
 
   async export(type: ReportType, scope: ReportScope, format: ExportFormat) {

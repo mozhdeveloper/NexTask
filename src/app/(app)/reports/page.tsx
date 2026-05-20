@@ -179,7 +179,7 @@ export default function ReportsPage() {
             {/* Scope */}
             <div className="space-y-1.5">
               <Label className="text-[11px] font-semibold uppercase tracking-widest text-ink-muted">Date scope</Label>
-              <Select value={scopeKind} onValueChange={(v) => startTransition(() => setScopeKind(v as ScopeKind))}>
+              <Select value={scopeKind} onValueChange={(v) => setScopeKind(v as ScopeKind)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SCOPE_OPTIONS.map((o) => (
