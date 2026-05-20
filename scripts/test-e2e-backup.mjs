@@ -16,8 +16,8 @@ import https from "https";
 const SUPABASE_URL       = "https://wydphvbdyyxryxeqdbxk.supabase.co";
 const SERVICE_ROLE_KEY   = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5ZHBodmJkeXl4cnl4ZXFkYnhrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTA0MTEyNCwiZXhwIjoyMDk0NjE3MTI0fQ.Ix9PaviqX7rMlIEu2mIg1jwpZmuL5fT2iFz6e9cyzuY";
 const RESEND_API_KEY     = "re_J6iZZDyW_MFbbVGZ1FYxRCyuW8SYZ7KDZ";
-const RESEND_FROM        = "NexTask Backups <onboarding@resend.dev>";
-const TEST_EMAIL         = "premium.global.official@gmail.com"; // Resend account owner — use until domain is verified
+const RESEND_FROM        = "NexTask Backups <backup@premiumoutletsph.com>";
+const TEST_EMAIL         = "jcuady@gmail.com"; // target email — domain premiumoutletsph.com is now verified
 const SUBMISSIONS_BUCKET = "submissions";
 const BACKUP_BUCKET      = "backups";
 const MAX_ATTACH_BYTES   = 20 * 1024 * 1024;
