@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import {
   ChevronLeft, ChevronRight,
-  CalendarDays, LayoutGrid, List, FileText,
+  CalendarDays, LayoutGrid, List, FileText, Filter,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layouts/PageHeader";
@@ -67,6 +67,12 @@ const STATUS_CHIP: Record<SubmissionStatus, string> = {
 
 const LEGEND: SubmissionStatus[] = [
   "submitted", "pending", "late", "missing", "revision_requested",
+];
+
+const FILTER_STATUSES: SubmissionStatus[] = [
+  "submitted", "pending", "late", "missing",
+  "revision_requested", "revision_approved", "revision_rejected",
+  "excused", "locked",
 ];
 
 
@@ -206,6 +212,7 @@ export default function CalendarPage() {
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [view, setView] = useState<CalView>("month");
   const [listGrouping, setListGrouping] = useState<ListGrouping>("month");
+  const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "all">("all");
 
   // ── employee pool ─────────────────────────────────────────────────────────
   // All active employees (no managers/admins) used for count badges.
@@ -259,9 +266,10 @@ export default function CalendarPage() {
     const m = new Map<string, Submission>();
     submissions
       .filter((s) => s.userId === effectiveId)
+      .filter((s) => statusFilter === "all" || s.status === statusFilter)
       .forEach((s) => m.set(s.date, s));
     return m;
-  }, [effectiveId, submissions]);
+  }, [effectiveId, submissions, statusFilter]);
 
 
   // ── navigation ────────────────────────────────────────────────────────────
@@ -296,12 +304,13 @@ export default function CalendarPage() {
     }
     return [...submissions]
       .filter((s) => s.userId === effectiveId)
+      .filter((s) => statusFilter === "all" || s.status === statusFilter)
       .filter((s) => {
         const d = parseISO(s.date);
         return isWithinInterval(d, { start: intervalStart, end: intervalEnd });
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [submissions, effectiveId, listGrouping]);
+  }, [submissions, effectiveId, listGrouping, statusFilter]);
 
   if (!user || !effectiveUser) return null;
 
@@ -412,7 +421,38 @@ export default function CalendarPage() {
         </div>
       </div>
 
-
+      {/* ── Status filter chips ───────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Filter className="h-3.5 w-3.5 flex-shrink-0 text-ink-muted" />
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={cn(
+              "inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              statusFilter === "all"
+                ? "border-primary bg-primary text-white shadow-sm"
+                : "border-surface-border bg-white text-ink-muted hover:border-ink-soft hover:text-ink"
+            )}
+          >
+            All statuses
+          </button>
+          {FILTER_STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                statusFilter === s
+                  ? cn(STATUS_CHIP[s], "shadow-sm")
+                  : "border-surface-border bg-white text-ink-muted hover:border-ink-soft hover:text-ink"
+              )}
+            >
+              <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", STATUS_DOT[s])} />
+              {STATUS_META[s].label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* ── MONTH VIEW ────────────────────────────────────────────────────── */}
       {view === "month" && (
