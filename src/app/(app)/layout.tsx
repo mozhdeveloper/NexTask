@@ -1,9 +1,11 @@
 "use client";
 import { AppShell } from "@/components/layouts/AppShell";
 import { useRequireAuth } from "@/hooks/useAuth";
+import { useDataBootstrap } from "@/hooks/useDataBootstrap";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { ready } = useRequireAuth();
+  useDataBootstrap();
   if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface-subtle">
