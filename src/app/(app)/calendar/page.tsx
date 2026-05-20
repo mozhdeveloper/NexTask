@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   format,
+  addDays, subDays,
   addMonths, subMonths,
   addWeeks, subWeeks,
   startOfMonth, endOfMonth,
   startOfWeek, endOfWeek,
   eachDayOfInterval,
-  isSameMonth, isSameDay,
+  isSameMonth, isSameDay, isSameWeek,
   isWithinInterval,
   parseISO,
 } from "date-fns";
@@ -241,9 +242,19 @@ export default function CalendarPage() {
   const [dayModalOpen, setDayModalOpen] = useState(false);
   const [view, setView] = useState<CalView>("month");
   const [listPeriod, setListPeriod] = useState<ListPeriod>("month");
+  const [listCursor, setListCursor] = useState(() => new Date());
   const [statusFilter, setStatusFilter] = useState<SubmissionStatus | "all">("all");
 
   const today = new Date();
+
+  // ── list navigation ───────────────────────────────────────────────────────
+  const listGoBack = () => setListCursor((c) =>
+    listPeriod === "day" ? subDays(c, 1) : listPeriod === "week" ? subWeeks(c, 1) : subMonths(c, 1)
+  );
+  const listGoFwd = () => setListCursor((c) =>
+    listPeriod === "day" ? addDays(c, 1) : listPeriod === "week" ? addWeeks(c, 1) : addMonths(c, 1)
+  );
+  const listGoToday = () => setListCursor(new Date());
 
   // ── employee pools ────────────────────────────────────────────────────────
   const allActiveEmployees = useMemo(
@@ -316,25 +327,24 @@ export default function CalendarPage() {
 
   // ── list items (period + status + user filtered) ──────────────────────────
   const listItems = useMemo(() => {
-    const now = new Date();
     let intervalStart: Date;
     let intervalEnd: Date;
     if (listPeriod === "day") {
-      intervalStart = new Date(now); intervalStart.setHours(0, 0, 0, 0);
-      intervalEnd   = new Date(now); intervalEnd.setHours(23, 59, 59, 999);
+      intervalStart = new Date(listCursor); intervalStart.setHours(0, 0, 0, 0);
+      intervalEnd   = new Date(listCursor); intervalEnd.setHours(23, 59, 59, 999);
     } else if (listPeriod === "week") {
-      intervalStart = startOfWeek(now);
-      intervalEnd   = endOfWeek(now);
+      intervalStart = startOfWeek(listCursor);
+      intervalEnd   = endOfWeek(listCursor);
     } else {
-      intervalStart = startOfMonth(now);
-      intervalEnd   = endOfMonth(now);
+      intervalStart = startOfMonth(listCursor);
+      intervalEnd   = endOfMonth(listCursor);
     }
     return [...submissions]
       .filter((s) => isAllMode ? allEmployeeIds.has(s.userId) : s.userId === effectiveId)
       .filter((s) => statusFilter === "all" || s.status === statusFilter)
       .filter((s) => isWithinInterval(parseISO(s.date), { start: intervalStart, end: intervalEnd }))
       .sort((a, b) => b.date.localeCompare(a.date) || a.userId.localeCompare(b.userId));
-  }, [submissions, isAllMode, allEmployeeIds, effectiveId, listPeriod, statusFilter]);
+  }, [submissions, isAllMode, allEmployeeIds, effectiveId, listPeriod, listCursor, statusFilter]);
 
   if (!user) return null;
 
@@ -343,11 +353,17 @@ export default function CalendarPage() {
     ? `${format(startOfWeek(cursor), "MMM d")} – ${format(endOfWeek(cursor), "MMM d, yyyy")}`
     : format(cursor, "MMMM yyyy");
 
-  const listPeriodLabel = {
-    day:   `Today, ${format(today, "MMMM d, yyyy")}`,
-    week:  `${format(startOfWeek(today), "MMM d")} – ${format(endOfWeek(today), "MMM d")}`,
-    month: format(today, "MMMM yyyy"),
-  }[listPeriod];
+  const isListToday =
+    listPeriod === "day"   ? isSameDay(listCursor, today)
+    : listPeriod === "week"  ? isSameWeek(listCursor, today)
+    : isSameMonth(listCursor, today);
+
+  const listPeriodLabel =
+    listPeriod === "day"
+      ? (isSameDay(listCursor, today) ? `Today — ${format(listCursor, "MMMM d, yyyy")}` : format(listCursor, "EEEE, MMMM d, yyyy"))
+    : listPeriod === "week"
+      ? `${format(startOfWeek(listCursor), "MMM d")} – ${format(endOfWeek(listCursor), "MMM d, yyyy")}`
+    : format(listCursor, "MMMM yyyy");
 
   // ── cell click handler ────────────────────────────────────────────────────
   const handleSelect = (d: Date) => {
@@ -450,18 +466,33 @@ export default function CalendarPage() {
             </Button>
           </div>
         ) : (
-          /* List view: period selector + period label */
+          /* List view: period selector + navigation */
           <div className="flex flex-wrap items-center gap-2">
             <SegmentedControl<ListPeriod>
               value={listPeriod}
-              onChange={setListPeriod}
+              onChange={(v) => { setListPeriod(v); setListCursor(new Date()); }}
               options={[
                 { value: "day",   label: "Daily"   },
                 { value: "week",  label: "Weekly"  },
                 { value: "month", label: "Monthly" },
               ]}
             />
-            <span className="text-sm text-ink-muted">{listPeriodLabel}</span>
+            <div className="flex items-center gap-1">
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={listGoBack} aria-label="Previous">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[160px] px-1 text-center text-sm font-semibold text-ink">
+                {listPeriodLabel}
+              </span>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={listGoFwd} aria-label="Next">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isListToday && (
+                <Button size="sm" variant="outline" onClick={listGoToday} className="ml-1 h-8 text-xs">
+                  Today
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
